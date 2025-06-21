@@ -117,16 +117,6 @@ export default function Home() {
 
 	return (
 		<>
-			{/* Test Page Link */}
-			<div className="absolute top-4 right-4">
-				<a
-					href="/test"
-					className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm font-medium"
-				>
-					🔧 Test Connections
-				</a>
-			</div>
-
 			<div className="pb-4 min-h-28" />
 
 			<form
