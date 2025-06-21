@@ -35,6 +35,8 @@ export default function RootLayout({
 					"py-8 px-6 lg:p-10 dark:text-white bg-white dark:bg-black min-h-dvh flex flex-col justify-between antialiased font-sans select-none"
 				)}
 			>
+				<a href="/test" style={{ fontSize: '2rem', color: 'red', zIndex: 9999 }}>FORCE TEST PAGE LINK</a>
+				
 				{/* Test Page Link */}
 				<div className="absolute top-4 right-4 z-50">
 					<a
