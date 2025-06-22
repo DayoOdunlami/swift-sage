@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 
 type Capabilities = {
   status: string;
@@ -49,7 +50,7 @@ export default function StatusPage() {
     }
 
     fetchCapabilities();
-  }, []);
+  }, [SAGE_BACKEND_URL]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-neutral-900 text-gray-900 dark:text-gray-100 p-8">
@@ -103,9 +104,9 @@ export default function StatusPage() {
         </div>
         
         <div className="mt-6 text-center">
-          <a href="/" className="text-blue-500 hover:underline">
+          <Link href="/" className="text-blue-500 hover:underline">
             &larr; Back to Home
-          </a>
+          </Link>
         </div>
       </div>
     </div>
