@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
 import { after } from "next/server";
+import { AICommandProcessor } from "../../lib/ai-command-processor";
 
 const groq = new Groq();
 
@@ -31,37 +32,31 @@ export async function POST(request: Request) {
 		"transcribe " + request.headers.get("x-vercel-id") || "local"
 	);
 	console.time(
-		"text completion " + request.headers.get("x-vercel-id") || "local"
+		"ai processing " + request.headers.get("x-vercel-id") || "local"
 	);
 
-	const completion = await groq.chat.completions.create({
-		model: "llama3-8b-8192",
-		messages: [
-			{
-				role: "system",
-				content: `- You are Swift, a friendly and helpful voice assistant.
-			- Respond briefly to the user's request, and do not provide unnecessary information.
-			- If you don't understand the user's request, ask for clarification.
-			- You do not have access to up-to-date information, so you should not provide real-time data.
-			- You are not capable of performing actions other than responding to the user.
-			- Do not use markdown, emojis, or other formatting in your responses. Respond in a way easily spoken by text-to-speech software.
-			- User location is ${await location()}.
-			- The current time is ${await time()}.
-			- Your large language model is Llama 3, created by Meta, the 8 billion parameter version. It is hosted on Groq, an AI infrastructure company that builds fast inference technology.
-			- Your text-to-speech model is Sonic, created and hosted by Cartesia, a company that builds fast and realistic speech synthesis technology.
-			- You are built with Next.js and hosted on Vercel.`,
-			},
-			...data.message,
-			{
-				role: "user",
-				content: transcript,
-			},
-		],
-	});
+	// Use our new AI + Todoist backend
+	let response: string;
+	try {
+		const processor = new AICommandProcessor();
+		const history = data.message.map((msg: any) => ({
+			role: msg.role,
+			content: msg.content
+		}));
 
-	const response = completion.choices[0].message.content;
+		const result = await processor.processCommand({
+			command: transcript,
+			history: history
+		});
+
+		response = result.message;
+	} catch (error) {
+		console.error("AI processing error:", error);
+		response = "I'm sorry, I encountered an error processing your request. Please try again.";
+	}
+
 	console.timeEnd(
-		"text completion " + request.headers.get("x-vercel-id") || "local"
+		"ai processing " + request.headers.get("x-vercel-id") || "local"
 	);
 
 	if (!response) return new Response("Invalid response", { status: 500 });
