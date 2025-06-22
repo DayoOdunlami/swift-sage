@@ -1,184 +1,111 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-export default function TestPage() {
-  const [results, setResults] = useState<any>({});
-  const [loading, setLoading] = useState(false);
+type Capabilities = {
+  status: string;
+  capabilities: string[];
+  timestamp: string;
+};
 
-  const testConnections = async () => {
-    setLoading(true);
-    const testResults: any = {};
+export default function StatusPage() {
+  const [data, setData] = useState<Capabilities | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
-    // Test 1: Check if we can reach the API endpoint
-    try {
-      const response = await fetch('/api', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          input: 'test message',
-          message: []
-        })
-      });
-      testResults.apiEndpoint = {
-        status: response.status,
-        ok: response.ok,
-        error: response.ok ? null : await response.text()
-      };
-    } catch (error) {
-      testResults.apiEndpoint = {
-        status: 'error',
-        ok: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
+  // IMPORTANT: Replace this with the actual URL of your deployed Python backend
+  const SAGE_BACKEND_URL = process.env.NEXT_PUBLIC_SAGE_BACKEND_URL || 'https://sage-ai-assistant-5s1z.vercel.app';
 
-    // Test 2: Check environment variables (client-side limited info)
-    testResults.envVars = {
-      hasGroqKey: !!process.env.NEXT_PUBLIC_GROQ_API_KEY,
-      hasCartesiaKey: !!process.env.NEXT_PUBLIC_CARTESIA_API_KEY,
-      nodeEnv: process.env.NODE_ENV,
-      vercelEnv: process.env.VERCEL_ENV
-    };
-
-    // Test 3: Test a simple text input
-    try {
-      const formData = new FormData();
-      formData.append('input', 'Hello, this is a test message');
-      formData.append('message', JSON.stringify([]));
-
-      const response = await fetch('/api', {
-        method: 'POST',
-        body: formData
-      });
+  useEffect(() => {
+    async function fetchCapabilities() {
+      setLoading(true);
+      setError(null);
       
-      testResults.textInput = {
-        status: response.status,
-        ok: response.ok,
-        hasTranscript: !!response.headers.get('X-Transcript'),
-        hasResponse: !!response.headers.get('X-Response'),
-        error: response.ok ? null : await response.text()
-      };
-    } catch (error) {
-      testResults.textInput = {
-        status: 'error',
-        ok: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
+      if (!SAGE_BACKEND_URL) {
+        setError('The SAGE_BACKEND_URL environment variable is not set. Please set NEXT_PUBLIC_SAGE_BACKEND_URL in your Vercel project.');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${SAGE_BACKEND_URL}/api/ai/capabilities`);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Network response was not ok: ${response.statusText} - ${errorText}`);
+        }
+
+        const result: Capabilities = await response.json();
+        setData(result);
+      } catch (e: unknown) {
+        if (e instanceof Error) {
+          setError(`Failed to fetch capabilities: ${e.message}`);
+        } else {
+          setError('An unknown error occurred.');
+        }
+      } finally {
+        setLoading(false);
+      }
     }
 
-    setResults(testResults);
-    setLoading(false);
-  };
+    fetchCapabilities();
+  }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Swift Sage - API Connection Test</h1>
-        
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">Connection Tests</h2>
-          <button
-            onClick={testConnections}
-            disabled={loading}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading ? 'Testing...' : 'Run Connection Tests'}
-          </button>
+    <div className="min-h-screen bg-gray-50 dark:bg-neutral-900 text-gray-900 dark:text-gray-100 p-8">
+      <div className="max-w-2xl mx-auto">
+        <header className="mb-8 border-b border-gray-200 dark:border-neutral-700 pb-4">
+          <h1 className="text-3xl font-bold">Swift Sage - System Status</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            A real-time check of the Python backend capabilities.
+          </p>
+        </header>
+
+        <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-semibold mb-4">Backend API Status</h2>
+          
+          {loading && <p className="text-blue-500">Loading system status...</p>}
+          
+          {error && (
+            <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 text-red-700 dark:text-red-300 px-4 py-3 rounded-md">
+              <strong className="font-bold">Error: </strong>
+              <span className="block sm:inline">{error}</span>
+            </div>
+          )}
+
+          {data && (
+            <div className="space-y-4">
+              <div className="flex items-center">
+                <span className={`h-4 w-4 rounded-full mr-3 ${data.status === 'online' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                <p>
+                  Status: <span className="font-semibold capitalize">{data.status}</span>
+                </p>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Available AI Functions:</h3>
+                {data.capabilities.length > 0 ? (
+                  <ul className="list-disc list-inside bg-gray-50 dark:bg-neutral-700/50 rounded-md p-4 space-y-1">
+                    {data.capabilities.map((func) => (
+                      <li key={func} className="font-mono text-sm">
+                        {func}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-gray-500">No capabilities reported.</p>
+                )}
+              </div>
+              <p className="text-xs text-gray-400 dark:text-gray-500 pt-2 border-t border-gray-200 dark:border-neutral-700">
+                Last checked: {new Date(data.timestamp).toLocaleString()}
+              </p>
+            </div>
+          )}
         </div>
-
-        {Object.keys(results).length > 0 && (
-          <div className="space-y-6">
-            {/* Environment Variables */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-semibold mb-3">Environment Variables</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="font-medium">Groq API Key:</span>
-                  <span className={`ml-2 ${results.envVars?.hasGroqKey ? 'text-green-600' : 'text-red-600'}`}>
-                    {results.envVars?.hasGroqKey ? '✅ Set' : '❌ Missing'}
-                  </span>
-                </div>
-                <div>
-                  <span className="font-medium">Cartesia API Key:</span>
-                  <span className={`ml-2 ${results.envVars?.hasCartesiaKey ? 'text-green-600' : 'text-red-600'}`}>
-                    {results.envVars?.hasCartesiaKey ? '✅ Set' : '❌ Missing'}
-                  </span>
-                </div>
-                <div>
-                  <span className="font-medium">Node Environment:</span>
-                  <span className="ml-2 text-gray-600">{results.envVars?.nodeEnv || 'Unknown'}</span>
-                </div>
-                <div>
-                  <span className="font-medium">Vercel Environment:</span>
-                  <span className="ml-2 text-gray-600">{results.envVars?.vercelEnv || 'Unknown'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* API Endpoint Test */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-semibold mb-3">API Endpoint Test</h3>
-              <div className="space-y-2">
-                <div>
-                  <span className="font-medium">Status:</span>
-                  <span className={`ml-2 ${results.apiEndpoint?.ok ? 'text-green-600' : 'text-red-600'}`}>
-                    {results.apiEndpoint?.status}
-                  </span>
-                </div>
-                {results.apiEndpoint?.error && (
-                  <div>
-                    <span className="font-medium">Error:</span>
-                    <span className="ml-2 text-red-600 text-sm">{results.apiEndpoint.error}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Text Input Test */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-semibold mb-3">Text Input Test</h3>
-              <div className="space-y-2">
-                <div>
-                  <span className="font-medium">Status:</span>
-                  <span className={`ml-2 ${results.textInput?.ok ? 'text-green-600' : 'text-red-600'}`}>
-                    {results.textInput?.status}
-                  </span>
-                </div>
-                <div>
-                  <span className="font-medium">Has Transcript:</span>
-                  <span className={`ml-2 ${results.textInput?.hasTranscript ? 'text-green-600' : 'text-red-600'}`}>
-                    {results.textInput?.hasTranscript ? '✅ Yes' : '❌ No'}
-                  </span>
-                </div>
-                <div>
-                  <span className="font-medium">Has Response:</span>
-                  <span className={`ml-2 ${results.textInput?.hasResponse ? 'text-green-600' : 'text-red-600'}`}>
-                    {results.textInput?.hasResponse ? '✅ Yes' : '❌ No'}
-                  </span>
-                </div>
-                {results.textInput?.error && (
-                  <div>
-                    <span className="font-medium">Error:</span>
-                    <span className="ml-2 text-red-600 text-sm">{results.textInput.error}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Instructions */}
-        <div className="bg-blue-50 rounded-lg p-6 mt-6">
-          <h3 className="text-lg font-semibold mb-3">Next Steps</h3>
-          <ul className="list-disc list-inside space-y-2 text-sm">
-            <li>If API keys are missing, add them to your Vercel environment variables</li>
-            <li>Required: <code className="bg-gray-200 px-1 rounded">GROQ_API_KEY</code> and <code className="bg-gray-200 px-1 rounded">CARTESIA_API_KEY</code></li>
-            <li>If the API endpoint fails, check the server logs for more details</li>
-            <li>Once basic tests pass, we can integrate with your Sage backend</li>
-          </ul>
+        
+        <div className="mt-6 text-center">
+          <a href="/" className="text-blue-500 hover:underline">
+            &larr; Back to Home
+          </a>
         </div>
       </div>
     </div>
