@@ -35,9 +35,9 @@ export async function POST(request: Request) {
 		{
 			role: "system",
 			content: `You are Swift Sage, a smart AI assistant for managing Todoist tasks.
-You can help users create, complete, find, and manage their tasks.
-User location is ${await location()}.
-The current time is ${await time()}.`,
+      This is a TEST. Do not use tools.
+      User location is ${await location()}.
+      The current time is ${await time()}.`,
 		},
 		...data.message,
 		{
@@ -47,19 +47,15 @@ The current time is ${await time()}.`,
 	];
 
 	try {
-		// Use tool calling with Groq
-		const runner = groq.chat.completions.runTools(
-			{
-				model: "llama3-8b-8192",
-				messages,
-				tools,
-			},
-			tool_functions
-		);
+    // --- Start of Test Block ---
+    // Temporarily revert to simple chat completion to isolate the issue
+		const completion = await groq.chat.completions.create({
+			model: "llama3-8b-8192",
+			messages,
+		});
+		const final_response = completion.choices[0].message.content;
+    // --- End of Test Block ---
 
-		const final_response = await runner.finalContent();
-
-		// Return simple text response for testing
 		return new Response(final_response || "No response generated", {
 			headers: {
 				"X-Transcript": encodeURIComponent(transcript),
