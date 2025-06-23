@@ -1,3 +1,5 @@
+"use client";
+
 // @ts-nocheck
 // This file is a carbon copy of the main page for safe tool integration experiments.
 
