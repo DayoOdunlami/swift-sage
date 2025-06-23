@@ -13,6 +13,7 @@ import { EnterIcon, LoadingIcon } from "@/lib/icons";
 import { usePlayer } from "@/lib/usePlayer";
 import { track } from "@vercel/analytics";
 import { useMicVAD, utils } from "@ricky0123/vad-react";
+import Link from "next/link";
 
 type Message = {
 	role: "user" | "assistant";
@@ -116,7 +117,22 @@ export default function Home() {
 	}
 
 	return (
-		<>
+		<main className="relative flex flex-col items-center justify-between min-h-screen p-4 overflow-hidden bg-white">
+			<div style={{ position: 'absolute', top: '20px', right: '20px' }}>
+				<Link href="/test" style={{ 
+					padding: '10px 20px', 
+					backgroundColor: '#007bff', 
+					color: 'white', 
+					textDecoration: 'none', 
+					borderRadius: '5px',
+					fontSize: '14px'
+				}}>
+					Test Tools
+				</Link>
+			</div>
+			<div className="absolute top-4 left-4 text-xs text-gray-500">
+				{player.CPUTime ? `CPU Time: ${player.CPUTime.toFixed(2)}ms` : ""}
+			</div>
 			<div className="pb-4 min-h-28" />
 
 			<form
@@ -190,7 +206,7 @@ export default function Home() {
 					}
 				)}
 			/>
-		</>
+		</main>
 	);
 }
 

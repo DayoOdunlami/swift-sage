@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 
 export default function TestToolsPage() {
   const [input, setInput] = useState('')
@@ -40,9 +41,23 @@ export default function TestToolsPage() {
   }
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-      <h1>Todoist Tool Testing</h1>
-      <p>Test the AI tool integration with Todoist</p>
+    <div style={{ maxWidth: '600px', margin: '40px auto', fontFamily: 'sans-serif' }}>
+      <div style={{ marginBottom: '20px' }}>
+        <Link href="/" style={{ 
+          padding: '8px 16px', 
+          backgroundColor: '#6c757d', 
+          color: 'white', 
+          textDecoration: 'none', 
+          borderRadius: '5px',
+          fontSize: '14px'
+        }}>
+          ← Back to Main
+        </Link>
+      </div>
+      <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '10px' }}>Todoist Tool Testing</h1>
+      <p style={{ marginBottom: '20px', color: '#555' }}>
+        Test the AI tool integration with Todoist
+      </p>
       
       <form onSubmit={handleSubmit}>
         <input
