@@ -3,15 +3,9 @@
 const TODOIST_API_BASE = 'https://api.todoist.com/rest/v2';
 const isDev = process.env.NODE_ENV === 'development';
 
-export async function createTask(
-  content: string,
-  options?: {
-    dueString?: string;
-    labels?: string[];
-  }
-) {
-  console.log('createTask called with:', { content, options });
-  if (isDev) console.log('🔧 Tool called: createTask', { content, options });
+export async function createTask(args: any) {
+  console.log('createTask called with:', args);
+  if (isDev) console.log('🔧 Tool called: createTask', args);
   
   try {
     const response = await fetch(`${TODOIST_API_BASE}/tasks`, {
@@ -21,48 +15,45 @@ export async function createTask(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        content,
-        due_string: options?.dueString,
-        labels: options?.labels,
+        content: args.content
       }),
     });
-    console.log('Todoist createTask API response status:', response.status);
+    console.log('Todoist API response status:', response.status);
     if (!response.ok) {
-      console.error('Todoist createTask API error:', response.status, await response.text());
-      return `Failed to create task: ${response.status}`;
+      const errorText = await response.text();
+      console.error('Todoist API error:', response.status, errorText);
+      return `Failed to create task: ${response.status} - ${errorText}`;
     }
     const task = await response.json();
     if (isDev) console.log('✅ Task created:', task.id);
-    return JSON.stringify(task);
+    return `Task created: "${task.content}"`;
   } catch (error: any) {
     console.error('createTask error:', error);
     return `Error creating task: ${error.message}`;
   }
 }
 
-export async function listTasks(filter?: string) {
-  console.log('listTasks called with:', { filter });
-  if (isDev) console.log('🔧 Tool called: listTasks', { filter });
+export async function listTasks(args: any) {
+  console.log('listTasks called with:', args);
+  if (isDev) console.log('🔧 Tool called: listTasks', args);
   
   try {
-    const url = new URL(`${TODOIST_API_BASE}/tasks`);
-    if (filter) url.searchParams.append('filter', filter);
-    
-    const response = await fetch(url.toString(), {
+    const response = await fetch(`${TODOIST_API_BASE}/tasks`, {
+      method: 'GET',
       headers: {
         'Authorization': `Bearer ${process.env.TODOIST_API_KEY}`,
         'Content-Type': 'application/json',
       },
     });
-    console.log('Todoist listTasks API response status:', response.status);
+    console.log('Todoist API response status:', response.status);
     if (!response.ok) {
-      console.error('Todoist listTasks API error:', response.status, await response.text());
-      return `Failed to fetch tasks: ${response.status}`;
+      const errorText = await response.text();
+      console.error('Todoist API error:', response.status, errorText);
+      return `Failed to fetch tasks: ${response.status} - ${errorText}`;
     }
-    
     const tasks = await response.json();
-    console.log('✅ Tasks retrieved:', tasks.length);
-    return JSON.stringify(tasks);
+    console.log('Tasks retrieved:', tasks.length);
+    return `You have ${tasks.length} tasks in your Todoist.`;
   } catch (error: any) {
     console.error('listTasks error:', error);
     return `Error listing tasks: ${error.message}`;
