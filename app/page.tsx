@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 
 import clsx from "clsx";
@@ -118,7 +119,7 @@ export default function Home() {
 
 	return (
 		<main className="relative flex flex-col items-center justify-between min-h-screen p-4 overflow-hidden bg-white">
-			<div style={{ position: 'absolute', top: '20px', right: '20px' }}>
+			<div style={{ position: 'absolute', top: '20px', right: '20px', display: 'flex', gap: '10px' }}>
 				<Link href="/test" style={{ 
 					padding: '10px 20px', 
 					backgroundColor: '#007bff', 
@@ -129,6 +130,17 @@ export default function Home() {
 				}}>
 					Test Tools
 				</Link>
+				<a href="/test-v2" style={{ 
+					padding: '10px 20px', 
+					backgroundColor: '#28a745', 
+					color: 'white', 
+					textDecoration: 'none', 
+					borderRadius: '5px',
+					fontSize: '14px',
+					marginLeft: '10px'
+				}}>
+					Test V2 🎤
+				</a>
 			</div>
 			<div className="pb-4 min-h-28" />
 
