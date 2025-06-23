@@ -215,6 +215,58 @@ export default function Home() {
 	);
 }
 
+function Messages({
+	messages,
+	isPending,
+	submit,
+}: {
+	messages: Array<Message>;
+	isPending: boolean;
+	submit: (data: string) => void;
+}) {
+	const listRef = useRef<HTMLUListElement>(null);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: `messages` is the only dependency that matters
+	useEffect(() => {
+		if (listRef.current) {
+			listRef.current.scrollTop = listRef.current.scrollHeight;
+		}
+	});
+
+	return (
+		<ul className="space-y-4" ref={listRef}>
+			{messages.map((message, i) => (
+				<li
+					key={i}
+					className={clsx("flex gap-4", {
+						"justify-end": message.role === "user",
+					})}
+				>
+					<div
+						className={clsx(
+							"rounded-xl p-4 text-white max-w-xl text-balance",
+							{
+								"bg-blue-600": message.role === "assistant",
+								"bg-neutral-600": message.role === "user",
+							}
+						)}
+					>
+						{message.content}
+					</div>
+				</li>
+			))}
+
+			{isPending && (
+				<li className="flex gap-4">
+					<div className="rounded-xl p-4 text-white max-w-xl text-balance bg-blue-600">
+						<LoadingIcon />
+					</div>
+				</li>
+			)}
+		</ul>
+	);
+}
+
 function A(props: any) {
 	return (
 		<a
