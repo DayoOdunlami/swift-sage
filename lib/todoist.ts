@@ -35,25 +35,72 @@ export async function createTask(args: any) {
 
 export async function listTasks(args: any) {
   console.log('listTasks called with:', args);
-  if (isDev) console.log('🔧 Tool called: listTasks', args);
-  
   try {
-    const response = await fetch(`${TODOIST_API_BASE}/tasks`, {
+    // Build query parameters for filtering
+    let url = `${TODOIST_API_BASE}/tasks`;
+    const params = new URLSearchParams();
+    
+    // Add filter if provided (for searching task content)
+    if (args.filter) {
+      params.append('filter', args.filter);
+    }
+    
+    // Add the query parameters to URL if any exist
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${process.env.TODOIST_API_KEY}`,
         'Content-Type': 'application/json',
       },
     });
+    
     console.log('Todoist API response status:', response.status);
+    
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Todoist API error:', response.status, errorText);
       return `Failed to fetch tasks: ${response.status} - ${errorText}`;
     }
+    
     const tasks = await response.json();
     console.log('Tasks retrieved:', tasks.length);
-    return `You have ${tasks.length} tasks in your Todoist.`;
+    
+    // If no tasks found
+    if (tasks.length === 0) {
+      return args.filter ? 
+        `No tasks found matching "${args.filter}".` : 
+        `You have no tasks in your Todoist.`;
+    }
+    
+    // Format detailed response
+    let response_text = `Found ${tasks.length} task${tasks.length > 1 ? 's' : ''}`;
+    if (args.filter) {
+      response_text += ` matching "${args.filter}"`;
+    }
+    response_text += ':
+\n';
+    
+    // Add first 5 tasks with details
+    const tasksToShow = tasks.slice(0, 5);
+    tasksToShow.forEach((task, index) => {
+      response_text += `${index + 1}. ${task.content}`;
+      if (task.due && task.due.string) {
+        response_text += ` (Due: ${task.due.string})`;
+      }
+      response_text += '\n';
+    });
+    
+    // Add more indicator if there are additional tasks
+    if (tasks.length > 5) {
+      response_text += `\n... and ${tasks.length - 5} more tasks.`;
+    }
+    
+    return response_text;
+    
   } catch (error: any) {
     console.error('listTasks error:', error);
     return `Error listing tasks: ${error.message}`;
