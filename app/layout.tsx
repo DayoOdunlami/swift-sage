@@ -35,13 +35,13 @@ export default function RootLayout({
 					"py-8 px-6 lg:p-10 dark:text-white bg-white dark:bg-black min-h-dvh flex flex-col justify-between antialiased font-sans select-none"
 				)}
 			>
-				{/* Test Page Link */}
+				{/* System Dashboard Link */}
 				<div className="absolute top-4 right-4 z-50">
 					<a
-						href="/test"
-						className="bg-gray-200 dark:bg-neutral-800 text-gray-900 dark:text-gray-100 px-4 py-2 rounded-md hover:bg-gray-300 dark:hover:bg-neutral-700 text-sm font-medium"
+						href="/system-dashboard"
+						className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm font-medium shadow-lg"
 					>
-						🔧 System Status
+						📊 System Dashboard
 					</a>
 				</div>
 				<main className="flex flex-col items-center justify-center grow">
