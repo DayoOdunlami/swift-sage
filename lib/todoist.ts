@@ -81,8 +81,7 @@ export async function listTasks(args: any) {
     if (args.filter) {
       response_text += ` matching "${args.filter}"`;
     }
-    response_text += ':
-\n';
+    response_text += ':\n\n';
     
     // Add first 5 tasks with details
     const tasksToShow = tasks.slice(0, 5);
