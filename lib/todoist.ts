@@ -1,6 +1,6 @@
-import { TodoistApi } from "@doist/todoist-api-typescript";
+// This file is now dependency-free and uses direct fetch calls.
 
-const api = new TodoistApi(process.env.TODOIST_API_KEY!);
+const TODOIST_API_BASE = 'https://api.todoist.com/rest/v2';
 const isDev = process.env.NODE_ENV === 'development';
 
 export async function createTask(
@@ -13,11 +13,22 @@ export async function createTask(
   if (isDev) console.log('🔧 Tool called: createTask', { content, options });
   
   try {
-    const task = await api.addTask({
-      content,
-      dueString: options?.dueString,
-      labels: options?.labels,
+    const response = await fetch(`${TODOIST_API_BASE}/tasks`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.TODOIST_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        content,
+        due_string: options?.dueString,
+        labels: options?.labels,
+      }),
     });
+
+    if (!response.ok) throw new Error(`API returned ${response.status}`);
+    
+    const task = await response.json();
     if (isDev) console.log('✅ Task created:', task.id);
     return JSON.stringify(task);
   } catch (error) {
@@ -30,7 +41,19 @@ export async function listTasks(filter?: string) {
   if (isDev) console.log('🔧 Tool called: listTasks', { filter });
   
   try {
-    const tasks = await api.getTasks({ filter });
+    const url = new URL(`${TODOIST_API_BASE}/tasks`);
+    if (filter) url.searchParams.append('filter', filter);
+    
+    const response = await fetch(url.toString(), {
+      headers: {
+        'Authorization': `Bearer ${process.env.TODOIST_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) throw new Error(`API returned ${response.status}`);
+    
+    const tasks = await response.json();
     if (isDev) console.log('✅ Tasks retrieved:', tasks.length);
     return JSON.stringify(tasks);
   } catch (error) {
