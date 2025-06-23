@@ -62,9 +62,9 @@ export async function listTasks(filter?: string) {
   }
 }
 
-export const tools = [
+export const tools: any[] = [
   {
-    type: "function" as const,
+    type: "function",
     function: {
       name: "createTask",
       description: "Creates a new task in Todoist",
@@ -95,7 +95,7 @@ export const tools = [
     },
   },
   {
-    type: "function" as const,
+    type: "function",
     function: {
       name: "listTasks",
       description: "List tasks from Todoist",
