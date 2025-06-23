@@ -130,10 +130,15 @@ export default function Home() {
 					Test Tools
 				</Link>
 			</div>
-			<div className="absolute top-4 left-4 text-xs text-gray-500">
-				{player.CPUTime ? `CPU Time: ${player.CPUTime.toFixed(2)}ms` : ""}
-			</div>
 			<div className="pb-4 min-h-28" />
+
+			<div className="w-full max-w-2xl">
+				<Messages
+					messages={messages}
+					isPending={isPending}
+					submit={submit}
+				/>
+			</div>
 
 			<form
 				className="rounded-full bg-neutral-200/80 dark:bg-neutral-800/80 flex items-center w-full max-w-3xl border border-transparent hover:border-neutral-300 focus-within:border-neutral-400 hover:focus-within:border-neutral-400 dark:hover:border-neutral-700 dark:focus-within:border-neutral-600 dark:hover:focus-within:border-neutral-600"
