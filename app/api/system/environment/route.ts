@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-  const environmentStatus = {
-    'GROQ_API_KEY': !!process.env.GROQ_API_KEY,
-    'CARTESIA_API_KEY': !!process.env.CARTESIA_API_KEY,
-    'TODOIST_API_KEY': !!process.env.TODOIST_API_KEY,
-    'OPENAI_API_KEY': !!process.env.OPENAI_API_KEY, // Check for this as well, just in case
-  };
+  const environmentChecks = [
+    { name: 'GROQ_API_KEY', status: !!process.env.GROQ_API_KEY },
+    { name: 'CARTESIA_API_KEY', status: !!process.env.CARTESIA_API_KEY },
+    { name: 'TODOIST_API_KEY', status: !!process.env.TODOIST_API_KEY },
+    { name: 'OPENAI_API_KEY', status: !!process.env.OPENAI_API_KEY },
+  ];
 
-  return NextResponse.json(environmentStatus);
+  return NextResponse.json({ environment: environmentChecks });
 } 

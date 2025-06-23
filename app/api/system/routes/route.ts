@@ -6,41 +6,41 @@ const API_ROUTES = [
   {
     path: '/api',
     method: 'POST',
-    purpose: 'Main AI conversation and voice processing endpoint.',
-    status: 'untested' as const,
+    description: 'Main AI conversation and voice processing endpoint.',
+    status: 'unknown' as const,
   },
   {
     path: '/api/system/environment',
     method: 'GET',
-    purpose: 'Checks the status of server-side environment variables.',
-    status: 'untested' as const,
+    description: 'Checks the status of server-side environment variables.',
+    status: 'unknown' as const,
   },
   {
     path: '/api/system/routes',
     method: 'GET',
-    purpose: 'Lists all available API routes in the application.',
-    status: 'untested' as const,
+    description: 'Lists all available API routes in the application.',
+    status: 'unknown' as const,
   },
   {
     path: '/api/system/functions',
     method: 'GET',
-    purpose: 'Lists all available AI function tools.',
-    status: 'untested' as const,
+    description: 'Lists all available AI function tools.',
+    status: 'unknown' as const,
   },
   {
     path: '/api/todoist/tasks',
     method: 'GET',
-    purpose: 'List all active tasks from Todoist.',
-    status: 'untested' as const,
+    description: 'List all active tasks from Todoist.',
+    status: 'unknown' as const,
   },
   {
     path: '/api/todoist/tasks',
     method: 'POST',
-    purpose: 'Create a new task in Todoist.',
-    status: 'untested' as const,
+    description: 'Create a new task in Todoist.',
+    status: 'unknown' as const,
   },
 ];
 
 export async function GET() {
-  return NextResponse.json(API_ROUTES);
+  return NextResponse.json({ routes: API_ROUTES });
 } 

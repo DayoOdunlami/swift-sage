@@ -1,326 +1,299 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { CheckCircle, XCircle, Clock, AlertCircle, Play, Zap, Vercel } from 'lucide-react';
 
-interface EnvironmentStatus {
-  [key: string]: boolean;
+interface EnvironmentCheck {
+  name: string;
+  status: boolean;
 }
 
 interface ApiRoute {
-  path: string;
   method: string;
-  purpose: string;
-  status?: 'working' | 'error' | 'testing' | 'untested';
-  responseTime?: number;
-  lastTested?: string;
-}
-
-interface AiFunction {
-  name: string;
-  status: 'implemented' | 'planned' | 'testing';
+  path: string;
   description: string;
-  parameters?: string[];
-  category: 'todoist' | 'voice' | 'system';
-}
-
-interface BuildInfo {
-  version: string;
-  environment: string;
-  timestamp: string;
-  vercel_env?: string;
+  status: 'testing' | 'success' | 'failed' | 'unknown';
+  responseTime?: number;
 }
 
 interface SystemHealth {
-  environment: EnvironmentStatus;
+  environment: EnvironmentCheck[];
   apiRoutes: ApiRoute[];
-  aiFunctions: AiFunction[];
-  buildInfo: BuildInfo;
+  buildInfo: {
+    version: string;
+    environment: string;
+    lastUpdated: string;
+  };
 }
 
-export default function SystemDashboardPage() {
+const SystemDashboard = () => {
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
   const [loading, setLoading] = useState(true);
-  const [testingRoute, setTestingRoute] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadSystemHealth = async () => {
+    try {
+      // Load environment status
+      const envResponse = await fetch('/api/system/environment');
+      const envData = await envResponse.json();
+
+      // Load API routes
+      const routesResponse = await fetch('/api/system/routes');
+      const routesData = await routesResponse.json();
+
+      setSystemHealth({
+        environment: envData.environment || [],
+        apiRoutes: routesData.routes || [],
+        buildInfo: {
+          version: '1.0.1',
+          environment: process.env.NODE_ENV || 'development',
+          lastUpdated: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      console.error('Failed to load system health:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const testApiRoute = async (route: ApiRoute, index: number) => {
+    const updatedRoutes = [...(systemHealth?.apiRoutes || [])];
+    updatedRoutes[index] = { ...route, status: 'testing' };
+    
+    setSystemHealth(prev => prev ? { ...prev, apiRoutes: updatedRoutes } : null);
+
+    try {
+      const startTime = Date.now();
+      const response = await fetch(route.path, { 
+        method: route.method === 'GET' ? 'GET' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: route.method === 'POST' ? JSON.stringify({}) : undefined,
+      });
+      const responseTime = Date.now() - startTime;
+
+      updatedRoutes[index] = {
+        ...route,
+        status: response.ok ? 'success' : 'failed',
+        responseTime,
+      };
+    } catch (error) {
+      updatedRoutes[index] = { ...route, status: 'failed' };
+    }
+
+    setSystemHealth(prev => prev ? { ...prev, apiRoutes: updatedRoutes } : null);
+  };
+
+  const refreshAll = () => {
+    setRefreshing(true);
+    loadSystemHealth();
+  };
 
   useEffect(() => {
     loadSystemHealth();
   }, []);
 
-  const loadSystemHealth = async () => {
-    setLoading(true);
-    try {
-      const [envRes, routesRes, functionsRes] = await Promise.all([
-        fetch('/api/system/environment'),
-        fetch('/api/system/routes'),
-        fetch('/api/system/functions'),
-      ]);
-
-      const environment = await envRes.json();
-      const apiRoutes = await routesRes.json();
-      const aiFunctions = await functionsRes.json();
-
-      setSystemHealth({
-        environment,
-        apiRoutes,
-        aiFunctions,
-        buildInfo: {
-          version: process.env.NEXT_PUBLIC_VERSION || '1.0.2',
-          environment: process.env.NODE_ENV || 'development',
-          timestamp: new Date().toISOString(),
-          vercel_env: process.env.NEXT_PUBLIC_VERCEL_ENV,
-        }
-      });
-    } catch (error) {
-      console.error('Failed to load system health:', error);
-      setSystemHealth(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const testApiRoute = async (routePath: string, method: string) => {
-    setTestingRoute(routePath);
-    try {
-      const startTime = Date.now();
-      
-      // For POST/PUT etc., send a dummy body. For GET, no body.
-      const requestOptions: RequestInit = {
-        method: method,
-        headers: { 'Content-Type': 'application/json' },
-      };
-      if (method !== 'GET' && method !== 'DELETE') {
-        requestOptions.body = JSON.stringify({ test: true, content: 'Test task from dashboard' });
-      }
-
-      const response = await fetch(routePath, requestOptions);
-      const responseTime = Date.now() - startTime;
-
-      setSystemHealth(prev => prev ? {
-        ...prev,
-        apiRoutes: prev.apiRoutes.map(r => 
-          r.path === routePath && r.method === method
-            ? { ...r, status: response.ok ? 'working' : 'error', responseTime, lastTested: new Date().toISOString() }
-            : r
-        )
-      } : null);
-
-    } catch (error) {
-      console.error(`Error testing route ${routePath}:`, error);
-      setSystemHealth(prev => prev ? {
-        ...prev,
-        apiRoutes: prev.apiRoutes.map(r => 
-          r.path === routePath && r.method === method
-            ? { ...r, status: 'error', lastTested: new Date().toISOString() }
-            : r
-        )
-      } : null);
-    } finally {
-      setTestingRoute(null);
-    }
-  };
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  if (!systemHealth) {
-    return (
-      <div className="container mx-auto p-6 text-center">
-        <Card className="max-w-md mx-auto">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-center space-x-2 text-red-600">
-              <AlertCircle className="h-6 w-6" />
-              <span>System Error</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Failed to load system health information.</p>
-            <p className="text-sm text-muted-foreground mt-2">Please check the server logs and ensure the system APIs are running.</p>
-            <Button onClick={loadSystemHealth} className="mt-4">Retry</Button>
-          </CardContent>
-        </Card>
+      <div style={{ padding: '20px', fontFamily: 'system-ui' }}>
+        <h1>Swift Sage System Dashboard</h1>
+        <p>Loading system health...</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen dark:bg-neutral-900">
-      <div className="container mx-auto p-4 md:p-8 space-y-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
+    <div style={{ 
+      padding: '20px', 
+      fontFamily: 'system-ui',
+      backgroundColor: '#f5f5f5',
+      minHeight: '100vh'
+    }}>
+      {/* Header */}
+      <div style={{ 
+        marginBottom: '30px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <h1 style={{ margin: 0, color: '#333' }}>Swift Sage System Dashboard</h1>
+        <button
+          onClick={refreshAll}
+          disabled={refreshing}
+          style={{
+            padding: '10px 20px',
+            backgroundColor: refreshing ? '#ccc' : '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '5px',
+            cursor: refreshing ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {refreshing ? 'Refreshing...' : '⚡ Refresh'}
+        </button>
+      </div>
+
+      {/* Build Information Card */}
+      <div style={{
+        backgroundColor: 'white',
+        padding: '20px',
+        borderRadius: '8px',
+        marginBottom: '20px',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      }}>
+        <h2 style={{ marginTop: 0, color: '#333' }}>Build Information</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Swift Sage Dashboard</h1>
-            <p className="text-muted-foreground">Real-time system health, API monitoring, and integration status.</p>
+            <strong>Version:</strong> {systemHealth?.buildInfo.version}
           </div>
-          <Button onClick={loadSystemHealth} variant="outline">
-            <Zap className="h-4 w-4 mr-2" />
-            Refresh Status
-          </Button>
+          <div>
+            <strong>Environment:</strong> {systemHealth?.buildInfo.environment}
+          </div>
+          <div>
+            <strong>Last Updated:</strong> {new Date(systemHealth?.buildInfo.lastUpdated || '').toLocaleString()}
+          </div>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
-            {/* API Routes */}
-            <Card>
-              <CardHeader>
-                <CardTitle>API Routes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {systemHealth.apiRoutes.map((route, index) => (
-                    <div key={`${route.path}-${route.method}-${index}`} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3">
-                          <Badge variant="outline" className="w-16 justify-center">{route.method}</Badge>
-                          <span className="font-mono text-sm">{route.path}</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1 ml-20">{route.purpose}</p>
-                      </div>
-                      <div className="flex items-center space-x-4 w-40 justify-end">
-                        {route.status && route.status !== 'untested' && (
-                           <Badge variant={route.status === 'working' ? 'default' : 'destructive'}>
-                              {route.status === 'working' ? <CheckCircle className="h-4 w-4 mr-1" /> : <XCircle className="h-4 w-4 mr-1" />}
-                              {route.status}
-                           </Badge>
-                        )}
-                        {route.responseTime !== undefined && (
-                          <span className="text-xs text-muted-foreground">{route.responseTime}ms</span>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => testApiRoute(route.path, route.method)}
-                          disabled={!!testingRoute}
-                          className="w-10 h-10 p-0"
-                        >
-                          {testingRoute === route.path ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                          ) : (
-                            <Play className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+      {/* Environment Variables Card */}
+      <div style={{
+        backgroundColor: 'white',
+        padding: '20px',
+        borderRadius: '8px',
+        marginBottom: '20px',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      }}>
+        <h2 style={{ marginTop: 0, color: '#333' }}>Environment Variables</h2>
+        <div style={{ display: 'grid', gap: '10px' }}>
+          {systemHealth?.environment.map((env) => (
+            <div key={env.name} style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '10px',
+              backgroundColor: '#f8f9fa',
+              borderRadius: '4px'
+            }}>
+              <span>{env.name}</span>
+              <span style={{ 
+                color: env.status ? '#28a745' : '#dc3545',
+                fontWeight: 'bold'
+              }}>
+                {env.status ? '✅' : '❌'}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
 
-            {/* AI Functions */}
-            <Card>
-              <CardHeader>
-                <CardTitle>AI Functions & Tools</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {systemHealth.aiFunctions.map((func) => (
-                    <div key={func.name} className="p-3 border rounded-lg">
-                       <div className="flex items-center justify-between">
-                          <span className="font-semibold">{func.name}</span>
-                          <Badge variant={func.status === 'implemented' ? 'default' : 'secondary'}>
-                            {func.status}
-                          </Badge>
-                        </div>
-                      <p className="text-sm text-muted-foreground mt-1">{func.description}</p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+      {/* API Routes Card */}
+      <div style={{
+        backgroundColor: 'white',
+        padding: '20px',
+        borderRadius: '8px',
+        marginBottom: '20px',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      }}>
+        <h2 style={{ marginTop: 0, color: '#333' }}>API Routes</h2>
+        <div style={{ display: 'grid', gap: '15px' }}>
+          {systemHealth?.apiRoutes.map((route, index) => (
+            <div key={`${route.method}-${route.path}`} style={{
+              display: 'grid',
+              gridTemplateColumns: '60px 1fr 100px 80px 100px',
+              gap: '15px',
+              alignItems: 'center',
+              padding: '15px',
+              backgroundColor: '#f8f9fa',
+              borderRadius: '4px'
+            }}>
+              <span style={{
+                backgroundColor: route.method === 'GET' ? '#28a745' : '#007bff',
+                color: 'white',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                fontSize: '12px',
+                textAlign: 'center'
+              }}>
+                {route.method}
+              </span>
+              <div>
+                <div style={{ fontWeight: 'bold' }}>{route.path}</div>
+                <div style={{ fontSize: '12px', color: '#666' }}>{route.description}</div>
+              </div>
+              <span style={{
+                color: route.status === 'success' ? '#28a745' : 
+                      route.status === 'failed' ? '#dc3545' :
+                      route.status === 'testing' ? '#ffc107' : '#6c757d'
+              }}>
+                {route.status === 'success' ? '✅' : 
+                 route.status === 'failed' ? '❌' :
+                 route.status === 'testing' ? '⏳' : '⚪'}
+              </span>
+              <span style={{ fontSize: '12px', color: '#666' }}>
+                {route.responseTime ? `${route.responseTime}ms` : '-'}
+              </span>
+              <button
+                onClick={() => testApiRoute(route, index)}
+                disabled={route.status === 'testing'}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: route.status === 'testing' ? '#ccc' : '#007bff',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  cursor: route.status === 'testing' ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {route.status === 'testing' ? 'Testing...' : '▶️ Test'}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
 
-          <div className="space-y-8">
-            {/* Environment Status */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Environment Variables</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {Object.entries(systemHealth.environment).map(([key, value]) => (
-                    <div key={key} className="flex items-center justify-between">
-                      <span className="font-mono text-sm">{key}</span>
-                      {value ? (
-                        <CheckCircle className="h-5 w-5 text-green-500" />
-                      ) : (
-                        <XCircle className="h-5 w-5 text-red-500" />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Build Info */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Build Information</CardTitle>
-              </CardHeader>
-              <CardContent>
-                 <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Version</span>
-                      <p className="font-mono text-sm">{systemHealth.buildInfo.version}</p>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Environment</span>
-                      <Badge variant={systemHealth.buildInfo.environment === 'production' ? 'default' : 'secondary'}>
-                        {systemHealth.buildInfo.environment}
-                      </Badge>
-                    </div>
-                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Vercel ENV</span>
-                      <Badge variant="outline">
-                        {systemHealth.buildInfo.vercel_env || 'N/A'}
-                      </Badge>
-                    </div>
-                 </div>
-              </CardContent>
-            </Card>
-
-             {/* Integration Progress */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Integration Checklist</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <IntegrationCheckItem label="Voice Interface (Groq)" isChecked={true} />
-                  <IntegrationCheckItem label="Text-to-Speech (Cartesia)" isChecked={true} />
-                  <IntegrationCheckItem 
-                    label="Todoist Direct API" 
-                    isChecked={systemHealth.apiRoutes.some(r => r.path.includes('todoist') && r.status === 'working')} 
-                  />
-                  <IntegrationCheckItem 
-                    label="AI Function Calling" 
-                    isChecked={systemHealth.aiFunctions.some(f => f.status === 'implemented' && f.category === 'todoist')} 
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+      {/* Integration Progress Card */}
+      <div style={{
+        backgroundColor: 'white',
+        padding: '20px',
+        borderRadius: '8px',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      }}>
+        <h2 style={{ marginTop: 0, color: '#333' }}>Integration Progress</h2>
+        <div style={{ display: 'grid', gap: '10px' }}>
+          {[
+            { name: 'Voice Interface', status: true, description: 'Groq + Cartesia working' },
+            { name: 'System Dashboard', status: true, description: 'Real-time monitoring' },
+            { name: 'Environment Setup', status: !!systemHealth?.environment.every(env => env.status), description: 'API keys configured' },
+            { name: 'Todoist Direct API', status: false, description: 'Basic CRUD operations' },
+            { name: 'AI Function Integration', status: false, description: 'Natural language processing' },
+            { name: 'End-to-End Workflow', status: false, description: 'Voice → AI → Todoist → Response' },
+          ].map((item) => (
+            <div key={item.name} style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '15px',
+              backgroundColor: '#f8f9fa',
+              borderRadius: '4px'
+            }}>
+              <div>
+                <div style={{ fontWeight: 'bold' }}>{item.name}</div>
+                <div style={{ fontSize: '12px', color: '#666' }}>{item.description}</div>
+              </div>
+              <span style={{
+                color: item.status ? '#28a745' : '#6c757d',
+                fontWeight: 'bold',
+                fontSize: '16px'
+              }}>
+                {item.status ? '✅' : '⭕'}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
   );
-}
+};
 
-const IntegrationCheckItem = ({ label, isChecked }: { label: string, isChecked: boolean }) => (
-  <div className="flex items-center justify-between">
-    <span className="text-sm">{label}</span>
-    {isChecked ? (
-      <CheckCircle className="h-5 w-5 text-green-500" />
-    ) : (
-      <Clock className="h-5 w-5 text-yellow-500" />
-    )}
-  </div>
-); 
+export default SystemDashboard; 
