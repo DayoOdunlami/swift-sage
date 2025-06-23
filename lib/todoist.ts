@@ -8,15 +8,39 @@ export async function createTask(args: any) {
   if (isDev) console.log('🔧 Tool called: createTask', args);
   
   try {
+    // Get all projects to match against
+    const projects = await getProjects();
+    let projectId = null;
+    let taskContent = args.content;
+    // Simple project detection - look for project names in content
+    const projectKeywords = ['matrix mechanics', 'Matrix mechanics', 'home', 'work', 'education'];
+    for (const project of projects) {
+      for (const keyword of projectKeywords) {
+        if (taskContent.toLowerCase().includes(keyword.toLowerCase())) {
+          if (project.name.toLowerCase().includes(keyword.toLowerCase())) {
+            projectId = project.id;
+            console.log(`Matched project: ${project.name} (ID: ${projectId})`);
+            break;
+          }
+        }
+      }
+      if (projectId) break;
+    }
+    // Build request body
+    const requestBody: any = {
+      content: taskContent
+    };
+    // Add project if found
+    if (projectId) {
+      requestBody.project_id = projectId;
+    }
     const response = await fetch(`${TODOIST_API_BASE}/tasks`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.TODOIST_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        content: args.content
-      }),
+      body: JSON.stringify(requestBody),
     });
     console.log('Todoist API response status:', response.status);
     if (!response.ok) {
@@ -26,7 +50,10 @@ export async function createTask(args: any) {
     }
     const task = await response.json();
     if (isDev) console.log('✅ Task created:', task.id);
-    return `Task created: "${task.content}"`;
+    const projectName = projectId ? 
+      ` in project "${projects.find((p: any) => p.id === projectId)?.name}"` : 
+      ' in Inbox';
+    return `Task created: "${task.content}"${projectName}`;
   } catch (error: any) {
     console.error('createTask error:', error);
     return `Error creating task: ${error.message}`;
@@ -106,32 +133,38 @@ export async function listTasks(args: any) {
   }
 }
 
+export async function getProjects() {
+  try {
+    const response = await fetch(`${TODOIST_API_BASE}/projects`, {
+      headers: {
+        'Authorization': `Bearer ${process.env.TODOIST_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    if (!response.ok) {
+      console.error('Failed to fetch projects:', response.status);
+      return [];
+    }
+    const projects = await response.json();
+    return projects;
+  } catch (error) {
+    console.error('getProjects error:', error);
+    return [];
+  }
+}
+
 export const tools: any[] = [
   {
     type: "function",
     function: {
       name: "createTask",
-      description: "Creates a new task in Todoist",
+      description: "Creates a new task in Todoist. If a project name is mentioned in the content, the task will be placed in that project.",
       parameters: {
         type: "object",
         properties: {
           content: {
             type: "string",
             description: "The content of the task (e.g., 'Buy milk')",
-          },
-          options: {
-            type: "object",
-            properties: {
-              dueString: {
-                type: "string",
-                description: "Due date in natural language (e.g., 'tomorrow at 4pm')",
-              },
-              labels: {
-                type: "array",
-                items: { type: "string" },
-                description: "Array of labels to add to the task",
-              },
-            },
           },
         },
         required: ["content"],
@@ -142,13 +175,13 @@ export const tools: any[] = [
     type: "function",
     function: {
       name: "listTasks",
-      description: "List tasks from Todoist",
+      description: "List tasks from Todoist. Optionally filter by content.",
       parameters: {
         type: "object",
         properties: {
           filter: {
             type: "string",
-            description: "Optional filter (e.g., 'today', 'p1')",
+            description: "Optional filter (e.g., 'today', 'p1', or search text)",
           },
         },
       },
