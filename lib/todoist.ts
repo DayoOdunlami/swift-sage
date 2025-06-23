@@ -64,7 +64,7 @@ export async function listTasks(filter?: string) {
 
 export const tools = [
   {
-    type: "function",
+    type: "function" as const,
     function: {
       name: "createTask",
       description: "Creates a new task in Todoist",
@@ -95,7 +95,7 @@ export const tools = [
     },
   },
   {
-    type: "function", 
+    type: "function" as const,
     function: {
       name: "listTasks",
       description: "List tasks from Todoist",
@@ -110,4 +110,4 @@ export const tools = [
       },
     },
   },
-];
+] as const;
