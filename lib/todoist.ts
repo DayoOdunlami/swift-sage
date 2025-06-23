@@ -191,7 +191,7 @@ export async function completeTask(args: any) {
     return `Task completed: "${matchingTask.content}"`;
   } catch (error) {
     console.error('completeTask error:', error);
-    return `Error completing task: ${error.message}`;
+    return `Error completing task: ${error instanceof Error ? error.message : 'Unknown error'}`;
   }
 }
 
@@ -242,7 +242,7 @@ export async function updateTask(args: any) {
     return `Task updated: "${updatedTask.content}"`;
   } catch (error) {
     console.error('updateTask error:', error);
-    return `Error updating task: ${error.message}`;
+    return `Error updating task: ${error instanceof Error ? error.message : 'Unknown error'}`;
   }
 }
 
@@ -283,7 +283,7 @@ export async function deleteTask(args: any) {
     return `Task deleted: "${matchingTask.content}"`;
   } catch (error) {
     console.error('deleteTask error:', error);
-    return `Error deleting task: ${error.message}`;
+    return `Error deleting task: ${error instanceof Error ? error.message : 'Unknown error'}`;
   }
 }
 
