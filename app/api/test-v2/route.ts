@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
 import { after } from "next/server";
+import { tools, createTask, listTasks, completeTask, updateTask, deleteTask, getProjects } from "../../../lib/todoist";
 
 const groq = new Groq();
 
@@ -20,6 +21,15 @@ const schema = zfd.formData({
 		)
 	),
 });
+
+// Map tool names to their functions
+const tool_functions = {
+	createTask,
+	listTasks,
+	completeTask,
+	updateTask,
+	deleteTask,
+};
 
 export async function POST(request: Request) {
 	console.time("transcribe " + request.headers.get("x-vercel-id") || "local");
@@ -45,7 +55,8 @@ export async function POST(request: Request) {
 			messages: [
 				{
 					role: "system",
-					content: `You are Swift Sage, a smart AI assistant.
+					content: `You are Swift Sage, a smart AI assistant with Todoist task management capabilities.
+					You can create, list, complete, update, and delete tasks through voice commands.
 					Respond briefly and naturally to voice commands.
 					User location is ${await location()}.
 					The current time is ${await time()}.`,
@@ -56,9 +67,26 @@ export async function POST(request: Request) {
 					content: transcript,
 				},
 			],
+			tools,
+			tool_choice: "auto",
 		});
 
-		response = completion.choices[0].message.content || "I'm not sure how to help with that.";
+		let final_response = completion.choices[0].message.content;
+		const tool_calls = completion.choices[0].message.tool_calls;
+
+		if (tool_calls && tool_calls.length > 0) {
+			for (const tool_call of tool_calls) {
+				const function_name = tool_call.function.name;
+				const function_args = JSON.parse(tool_call.function.arguments);
+				
+				if (tool_functions[function_name]) {
+					const result = await tool_functions[function_name](function_args);
+					final_response = result;
+				}
+			}
+		}
+
+		response = final_response || "I'm not sure how to help with that.";
 	} catch (error) {
 		console.error("AI processing error:", error);
 		response = "I'm sorry, I encountered an error processing your request. Please try again.";
