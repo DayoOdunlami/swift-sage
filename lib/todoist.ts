@@ -153,6 +153,140 @@ export async function getProjects() {
   }
 }
 
+// Complete/close a task
+export async function completeTask(args: any) {
+  console.log('completeTask called with:', args);
+  try {
+    // First, find the task by searching content
+    const allTasks = await fetch(`${TODOIST_API_BASE}/tasks`, {
+      headers: {
+        'Authorization': `Bearer ${process.env.TODOIST_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    if (!allTasks.ok) {
+      return `Failed to fetch tasks for completion`;
+    }
+    const tasks = await allTasks.json();
+    // Find task by partial content match
+    const searchTerm = args.taskIdentifier || args.content || args.task;
+    const matchingTask = tasks.find((task: any) => 
+      task.content.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    if (!matchingTask) {
+      return `No task found matching "${searchTerm}". Please be more specific.`;
+    }
+    // Complete the task
+    const response = await fetch(`${TODOIST_API_BASE}/tasks/${matchingTask.id}/close`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.TODOIST_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      return `Failed to complete task: ${response.status} - ${errorText}`;
+    }
+    return `Task completed: "${matchingTask.content}"`;
+  } catch (error) {
+    console.error('completeTask error:', error);
+    return `Error completing task: ${error.message}`;
+  }
+}
+
+// Update/edit a task
+export async function updateTask(args: any) {
+  console.log('updateTask called with:', args);
+  try {
+    // Get all tasks to find the one to update
+    const allTasks = await fetch(`${TODOIST_API_BASE}/tasks`, {
+      headers: {
+        'Authorization': `Bearer ${process.env.TODOIST_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    if (!allTasks.ok) {
+      return `Failed to fetch tasks for updating`;
+    }
+    const tasks = await allTasks.json();
+    // Find task by partial content match
+    const searchTerm = args.taskIdentifier || args.oldContent || args.task;
+    const matchingTask = tasks.find((task: any) => 
+      task.content.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    if (!matchingTask) {
+      return `No task found matching "${searchTerm}". Please be more specific.`;
+    }
+    // Build update payload
+    const updatePayload: any = {};
+    if (args.newContent || args.content) {
+      updatePayload.content = args.newContent || args.content;
+    }
+    if (args.dueString) {
+      updatePayload.due_string = args.dueString;
+    }
+    const response = await fetch(`${TODOIST_API_BASE}/tasks/${matchingTask.id}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.TODOIST_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updatePayload),
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      return `Failed to update task: ${response.status} - ${errorText}`;
+    }
+    const updatedTask = await response.json();
+    return `Task updated: "${updatedTask.content}"`;
+  } catch (error) {
+    console.error('updateTask error:', error);
+    return `Error updating task: ${error.message}`;
+  }
+}
+
+// Delete a task
+export async function deleteTask(args: any) {
+  console.log('deleteTask called with:', args);
+  try {
+    // Get all tasks to find the one to delete
+    const allTasks = await fetch(`${TODOIST_API_BASE}/tasks`, {
+      headers: {
+        'Authorization': `Bearer ${process.env.TODOIST_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    if (!allTasks.ok) {
+      return `Failed to fetch tasks for deletion`;
+    }
+    const tasks = await allTasks.json();
+    // Find task by partial content match
+    const searchTerm = args.taskIdentifier || args.content || args.task;
+    const matchingTask = tasks.find((task: any) => 
+      task.content.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    if (!matchingTask) {
+      return `No task found matching "${searchTerm}". Please be more specific.`;
+    }
+    const response = await fetch(`${TODOIST_API_BASE}/tasks/${matchingTask.id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${process.env.TODOIST_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      return `Failed to delete task: ${response.status} - ${errorText}`;
+    }
+    return `Task deleted: "${matchingTask.content}"`;
+  } catch (error) {
+    console.error('deleteTask error:', error);
+    return `Error deleting task: ${error.message}`;
+  }
+}
+
 export const tools: any[] = [
   {
     type: "function",
@@ -187,4 +321,64 @@ export const tools: any[] = [
       },
     },
   },
+  // Add CRUD tools
+  {
+    type: "function",
+    function: {
+      name: "completeTask",
+      description: "Mark a task as completed in Todoist",
+      parameters: {
+        type: "object",
+        properties: {
+          taskIdentifier: {
+            type: "string",
+            description: "Part of the task content to identify which task to complete"
+          }
+        },
+        required: ["taskIdentifier"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "updateTask",
+      description: "Edit or update a task in Todoist",
+      parameters: {
+        type: "object",
+        properties: {
+          taskIdentifier: {
+            type: "string",
+            description: "Part of the task content to identify which task to update"
+          },
+          newContent: {
+            type: "string",
+            description: "New content/text for the task"
+          },
+          dueString: {
+            type: "string",
+            description: "New due date in natural language (e.g., 'tomorrow', 'next week')"
+          }
+        },
+        required: ["taskIdentifier"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "deleteTask",
+      description: "Delete a task from Todoist permanently",
+      parameters: {
+        type: "object",
+        properties: {
+          taskIdentifier: {
+            type: "string",
+            description: "Part of the task content to identify which task to delete"
+          }
+        },
+        required: ["taskIdentifier"]
+      }
+    }
+  }
 ] as const;

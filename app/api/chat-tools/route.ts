@@ -2,7 +2,7 @@ import Groq from "groq-sdk";
 import { headers } from "next/headers";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
-import { tools, createTask, listTasks } from "../../../lib/todoist";
+import { tools, createTask, listTasks, completeTask, updateTask, deleteTask } from "../../../lib/todoist";
 
 const groq = new Groq();
 
@@ -22,6 +22,9 @@ const schema = zfd.formData({
 const tool_functions = {
   createTask,
   listTasks,
+  completeTask,
+  updateTask,
+  deleteTask,
 };
 
 export async function POST(request: Request) {
