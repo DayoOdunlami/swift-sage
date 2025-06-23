@@ -3,7 +3,6 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
 import { after } from "next/server";
-import { AICommandProcessor } from "../../lib/ai-command-processor";
 
 const groq = new Groq();
 
@@ -35,21 +34,30 @@ export async function POST(request: Request) {
 		"ai processing " + request.headers.get("x-vercel-id") || "local"
 	);
 
-	// Use our new AI + Todoist backend
+	// Use Groq for AI processing
 	let response: string;
 	try {
-		const processor = new AICommandProcessor();
-		const history = data.message.map((msg: any) => ({
-			role: msg.role,
-			content: msg.content
-		}));
-
-		const result = await processor.processCommand({
-			command: transcript,
-			history: history
+		const completion = await groq.chat.completions.create({
+			model: "llama3-8b-8192",
+			messages: [
+				{
+					role: "system",
+					content: `You are Swift Sage, a smart AI assistant for managing Todoist tasks.
+					You can help users create, complete, find, and manage their tasks.
+					Respond briefly and naturally to voice commands.
+					If the user asks about tasks, be helpful but note that you're currently in demo mode.
+					User location is ${await location()}.
+					The current time is ${await time()}.`,
+				},
+				...data.message,
+				{
+					role: "user",
+					content: transcript,
+				},
+			],
 		});
 
-		response = result.message;
+		response = completion.choices[0].message.content || "I'm not sure how to help with that.";
 	} catch (error) {
 		console.error("AI processing error:", error);
 		response = "I'm sorry, I encountered an error processing your request. Please try again.";
