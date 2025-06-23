@@ -85,7 +85,7 @@ export async function listTasks(args: any) {
     
     // Add first 5 tasks with details
     const tasksToShow = tasks.slice(0, 5);
-    tasksToShow.forEach((task: any, index) => {
+    tasksToShow.forEach((task: any, index: number) => {
       response_text += `${index + 1}. ${task.content}`;
       if (task.due && task.due.string) {
         response_text += ` (Due: ${task.due.string})`;
