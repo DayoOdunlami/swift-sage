@@ -47,14 +47,27 @@ export async function POST(request: Request) {
 	];
 
 	try {
-    // --- Start of Test Block ---
-    // Temporarily revert to simple chat completion to isolate the issue
-		const completion = await groq.chat.completions.create({
-			model: "llama3-8b-8192",
-			messages,
-		});
-		const final_response = completion.choices[0].message.content;
-    // --- End of Test Block ---
+    const completion = await groq.chat.completions.create({
+      model: "llama3-8b-8192",
+      messages,
+      tools,
+      tool_choice: "auto",
+    });
+
+    let final_response = completion.choices[0].message.content;
+    const tool_calls = completion.choices[0].message.tool_calls;
+
+    if (tool_calls && tool_calls.length > 0) {
+      for (const tool_call of tool_calls) {
+        const function_name = tool_call.function.name;
+        const function_args = JSON.parse(tool_call.function.arguments);
+        
+        if (tool_functions[function_name as keyof typeof tool_functions]) {
+          const result = await (tool_functions[function_name as keyof typeof tool_functions] as any)(function_args);
+          final_response = result;
+        }
+      }
+    }
 
 		return new Response(final_response || "No response generated", {
 			headers: {
