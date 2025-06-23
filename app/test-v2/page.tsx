@@ -123,7 +123,7 @@ export default function TestV2() {
 			<title>Swift Sage - Test V2</title>
 			<main className="relative flex flex-col items-center justify-between min-h-screen p-4 overflow-hidden bg-white">
 				<div style={{ position: 'absolute', top: '20px', left: '20px' }}>
-					<a href="/" style={{ 
+					<Link href="/" style={{ 
 						padding: '8px 16px', 
 						backgroundColor: '#6c757d', 
 						color: 'white', 
@@ -132,7 +132,7 @@ export default function TestV2() {
 						fontSize: '14px'
 					}}>
 						← Back to Main
-					</a>
+					</Link>
 				</div>
 				<div style={{ position: 'absolute', top: '20px', right: '20px' }}>
 					<Link href="/test" style={{ 
@@ -229,5 +229,66 @@ export default function TestV2() {
 				/>
 			</main>
 		</>
+	);
+}
+
+function Messages({
+	messages,
+	isPending,
+	submit,
+}: {
+	messages: Array<Message>;
+	isPending: boolean;
+	submit: (data: string) => void;
+}) {
+	const listRef = useRef<HTMLUListElement>(null);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: `messages` is the only dependency that matters
+	useEffect(() => {
+		if (listRef.current) {
+			listRef.current.scrollTop = listRef.current.scrollHeight;
+		}
+	});
+
+	return (
+		<ul className="space-y-4" ref={listRef}>
+			{messages.map((message, i) => (
+				<li
+					key={i}
+					className={clsx("flex gap-4", {
+						"justify-end": message.role === "user",
+					})}
+				>
+					<div
+						className={clsx(
+							"rounded-xl p-4 text-white max-w-xl text-balance",
+							{
+								"bg-blue-600": message.role === "assistant",
+								"bg-neutral-600": message.role === "user",
+							}
+						)}
+					>
+						{message.content}
+					</div>
+				</li>
+			))}
+
+			{isPending && (
+				<li className="flex gap-4">
+					<div className="rounded-xl p-4 text-white max-w-xl text-balance bg-blue-600">
+						<LoadingIcon />
+					</div>
+				</li>
+			)}
+		</ul>
+	);
+}
+
+function A(props: any) {
+	return (
+		<a
+			{...props}
+			className="text-neutral-500 dark:text-neutral-500 hover:underline font-medium"
+		/>
 	);
 } 
