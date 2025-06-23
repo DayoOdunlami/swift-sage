@@ -165,7 +165,8 @@ export default function Home() {
 							<A href="https://github.com/ai-ng/swift" target="_blank">
 								Learn more
 							</A>
-							.
+							.{" "}
+							<A href="/test">Test Tools</A>.
 						</p>
 
 						{vad.loading ? (

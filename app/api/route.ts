@@ -42,10 +42,8 @@ export async function POST(request: Request) {
 			messages: [
 				{
 					role: "system",
-					content: `You are Swift Sage, a smart AI assistant for managing Todoist tasks.
-					You can help users create, complete, find, and manage their tasks.
+					content: `You are Swift Sage, a smart AI assistant.
 					Respond briefly and naturally to voice commands.
-					If the user asks about tasks, be helpful but note that you're currently in demo mode.
 					User location is ${await location()}.
 					The current time is ${await time()}.`,
 				},

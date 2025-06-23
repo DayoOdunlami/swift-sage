@@ -16,7 +16,6 @@ export default function TestToolsPage() {
 
     const formData = new FormData()
     formData.append('input', input)
-    formData.append('message', JSON.stringify([]))
 
     try {
       const res = await fetch('/api/chat-tools', {
