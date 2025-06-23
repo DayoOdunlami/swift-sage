@@ -3,8 +3,6 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
 import { after } from "next/server";
-import { tools } from "../../lib/tools";
-import { createTask, listTasks } from "../../lib/todoist";
 
 const groq = new Groq();
 
@@ -13,11 +11,8 @@ const schema = zfd.formData({
 	message: zfd.repeatableOfType(
 		zfd.json(
 			z.object({
-				role: z.enum(["user", "assistant", "tool"]),
-				content: z.string().optional(),
-				tool_calls: z.array(z.any()).optional(),
-				tool_call_id: z.string().optional(),
-				name: z.string().optional(),
+				role: z.enum(["user", "assistant"]),
+				content: z.string(),
 			})
 		)
 	),
@@ -39,76 +34,40 @@ export async function POST(request: Request) {
 		"ai processing " + request.headers.get("x-vercel-id") || "local"
 	);
 
-	const initialMessages = data.message.length
-		? data.message
-		: [{ role: "user", content: transcript }];
-
-	const systemPrompt = `You are Swift Sage, a smart AI assistant for managing Todoist tasks. You can use tools to help the user. If the user asks to list/show/find tasks, use list_tasks. If they ask to create/add a task, use create_task. Always respond with a thoughtful, conversational message based on the tool's output. If a tool fails or returns no results, tell the user in a helpful, apologetic way.`;
-
-	let messages: any[] = [
-		{ role: "system", content: systemPrompt },
-		...initialMessages,
-	];
-
-	if (data.message.length > 0) {
-		messages.push({ role: "user", content: transcript });
-	}
-
-	// --- AI Orchestration Logic ---
-	const initialResponse = await groq.chat.completions.create({
-		model: "llama3-8b-8192",
-		messages,
-		tools: tools,
-	});
-
-	const { message: responseMessage } = initialResponse.choices[0];
-	messages.push(responseMessage);
-
-	let finalMessageContent = "";
-
-	if (responseMessage.tool_calls) {
-		for (const toolCall of responseMessage.tool_calls) {
-			const functionName = toolCall.function.name;
-			const functionArgs = JSON.parse(toolCall.function.arguments);
-			let toolResponse = null;
-
-			try {
-				if (functionName === "list_tasks") {
-					toolResponse = await listTasks(functionArgs.filter);
-				} else if (functionName === "create_task") {
-					toolResponse = await createTask(functionArgs);
-				}
-
-				messages.push({
-					tool_call_id: toolCall.id,
-					role: "tool",
-					name: functionName,
-					content: JSON.stringify(toolResponse),
-				});
-			} catch (error) {
-				messages.push({
-					tool_call_id: toolCall.id,
-					role: "tool",
-					name: functionName,
-					content: JSON.stringify({ error: "Tool execution failed." }),
-				});
-			}
-		}
-
-		const secondResponse = await groq.chat.completions.create({
+	// Use Groq for AI processing
+	let response: string;
+	try {
+		const completion = await groq.chat.completions.create({
 			model: "llama3-8b-8192",
-			messages,
+			messages: [
+				{
+					role: "system",
+					content: `You are Swift Sage, a smart AI assistant for managing Todoist tasks.
+					You can help users create, complete, find, and manage their tasks.
+					Respond briefly and naturally to voice commands.
+					If the user asks about tasks, be helpful but note that you're currently in demo mode.
+					User location is ${await location()}.
+					The current time is ${await time()}.`,
+				},
+				...data.message,
+				{
+					role: "user",
+					content: transcript,
+				},
+			],
 		});
-		finalMessageContent = secondResponse.choices[0].message.content || "I'm not sure how to respond to that.";
-	} else {
-		finalMessageContent = responseMessage.content || "I'm sorry, I'm not sure how to help with that.";
+
+		response = completion.choices[0].message.content || "I'm not sure how to help with that.";
+	} catch (error) {
+		console.error("AI processing error:", error);
+		response = "I'm sorry, I encountered an error processing your request. Please try again.";
 	}
 
 	console.timeEnd(
 		"ai processing " + request.headers.get("x-vercel-id") || "local"
 	);
 
-	if (!finalMessageContent) return new Response("Invalid response", { status: 500 });
+	if (!response) return new Response("Invalid response", { status: 500 });
 
 	console.time(
 		"cartesia request " + request.headers.get("x-vercel-id") || "local"
@@ -123,7 +82,7 @@ export async function POST(request: Request) {
 		},
 		body: JSON.stringify({
 			model_id: "sonic-english",
-			transcript: finalMessageContent,
+			transcript: response,
 			voice: {
 				mode: "id",
 				id: "79a125e8-cd45-4c13-8a67-188112f4dd22",
@@ -153,8 +112,7 @@ export async function POST(request: Request) {
 	return new Response(voice.body, {
 		headers: {
 			"X-Transcript": encodeURIComponent(transcript),
-			"X-Response": encodeURIComponent(finalMessageContent),
-			"Content-Type": "application/octet-stream",
+			"X-Response": encodeURIComponent(response),
 		},
 	});
 }
@@ -178,7 +136,7 @@ async function time() {
 }
 
 async function getTranscript(input: string | File) {
-	if (typeof input === "string") return input.trim() || null;
+	if (typeof input === "string") return input;
 
 	try {
 		const { text } = await groq.audio.transcriptions.create({
