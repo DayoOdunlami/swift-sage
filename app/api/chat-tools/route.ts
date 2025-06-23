@@ -31,7 +31,7 @@ export async function POST(request: Request) {
 	const transcript = await getTranscript(data.input);
 	if (!transcript) return new Response("Invalid input", { status: 400 });
 
-	const messages: Groq.Chat.CompletionCreateParams.Message[] = [
+	const messages: any[] = [
 		{
 			role: "system",
 			content: `You are Swift Sage, a smart AI assistant for managing Todoist tasks.
