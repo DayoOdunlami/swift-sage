@@ -10,6 +10,7 @@ export async function createTask(
     labels?: string[];
   }
 ) {
+  console.log('createTask called with:', { content, options });
   if (isDev) console.log('🔧 Tool called: createTask', { content, options });
   
   try {
@@ -25,19 +26,22 @@ export async function createTask(
         labels: options?.labels,
       }),
     });
-
-    if (!response.ok) throw new Error(`API returned ${response.status}`);
-    
+    console.log('Todoist createTask API response status:', response.status);
+    if (!response.ok) {
+      console.error('Todoist createTask API error:', response.status, await response.text());
+      return `Failed to create task: ${response.status}`;
+    }
     const task = await response.json();
     if (isDev) console.log('✅ Task created:', task.id);
     return JSON.stringify(task);
-  } catch (error) {
-    if (isDev) console.log('❌ Task creation failed:', error);
-    return "Error creating task. Please check the server logs.";
+  } catch (error: any) {
+    console.error('createTask error:', error);
+    return `Error creating task: ${error.message}`;
   }
 }
 
 export async function listTasks(filter?: string) {
+  console.log('listTasks called with:', { filter });
   if (isDev) console.log('🔧 Tool called: listTasks', { filter });
   
   try {
@@ -50,15 +54,18 @@ export async function listTasks(filter?: string) {
         'Content-Type': 'application/json',
       },
     });
-
-    if (!response.ok) throw new Error(`API returned ${response.status}`);
+    console.log('Todoist listTasks API response status:', response.status);
+    if (!response.ok) {
+      console.error('Todoist listTasks API error:', response.status, await response.text());
+      return `Failed to fetch tasks: ${response.status}`;
+    }
     
     const tasks = await response.json();
-    if (isDev) console.log('✅ Tasks retrieved:', tasks.length);
+    console.log('✅ Tasks retrieved:', tasks.length);
     return JSON.stringify(tasks);
-  } catch (error) {
-    if (isDev) console.log('❌ Task listing failed:', error);
-    return "Error listing tasks. Please check the server logs.";
+  } catch (error: any) {
+    console.error('listTasks error:', error);
+    return `Error listing tasks: ${error.message}`;
   }
 }
 
