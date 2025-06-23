@@ -68,7 +68,7 @@ const SystemDashboard = () => {
       const response = await fetch(route.path, { 
         method: route.method === 'GET' ? 'GET' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: route.method === 'POST' ? JSON.stringify({}) : undefined,
+        body: route.method === 'POST' ? JSON.stringify({ content: 'Test task from dashboard' }) : undefined,
       });
       const responseTime = Date.now() - startTime;
 

@@ -22,12 +22,6 @@ const API_ROUTES = [
     status: 'unknown' as const,
   },
   {
-    path: '/api/system/functions',
-    method: 'GET',
-    description: 'Lists all available AI function tools.',
-    status: 'unknown' as const,
-  },
-  {
     path: '/api/todoist/tasks',
     method: 'GET',
     description: 'List all active tasks from Todoist.',
