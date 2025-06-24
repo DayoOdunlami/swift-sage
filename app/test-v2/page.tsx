@@ -452,7 +452,7 @@ export default function TestV2() {
 						<label className="block text-sm font-medium mb-2">🧠 AI Brain Provider:</label>
 						<select 
 							value={llmProvider} 
-							onChange={(e) => setLlmProvider(e.target.value)}
+							onChange={(e) => setLlmProvider(e.target.value as "groq" | "openai" | "claude" | "gemini")}
 							className="w-full px-3 py-1 border rounded"
 						>
 							<option value="groq">⚡ Groq Llama-3 (Free, Fast) ✅ Available</option>
@@ -467,7 +467,7 @@ export default function TestV2() {
 						<label className="block text-sm font-medium mb-2">🗣️ Voice Provider:</label>
 						<select 
 							value={ttsProvider} 
-							onChange={(e) => setTtsProvider(e.target.value)}
+							onChange={(e) => setTtsProvider(e.target.value as "webspeech" | "cartesia" | "openai-tts")}
 							className="w-full px-3 py-1 border rounded"
 						>
 							<option value="webspeech">🆓 Web Speech (Free, Browser) ✅ Available</option>
