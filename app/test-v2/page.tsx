@@ -70,6 +70,82 @@ export default function TestV2() {
 	// ADD: Provider state
 	const [useWebSpeech, setUseWebSpeech] = useState(true);
 
+	// STAGE 2: Multi-provider state management
+	const [llmProvider, setLlmProvider] = useState<'groq' | 'openai' | 'claude' | 'gemini'>('groq');
+	const [ttsProvider, setTtsProvider] = useState<'webspeech' | 'cartesia' | 'openai-tts'>('webspeech');
+
+	// STAGE 2: Cost tracking system
+	interface UsageStats {
+		groq: { calls: number; estimatedCost: number };
+		openai: { calls: number; estimatedCost: number };
+		claude: { calls: number; estimatedCost: number };
+		gemini: { calls: number; estimatedCost: number };
+		cartesia: { calls: number; estimatedCost: number };
+		'openai-tts': { calls: number; estimatedCost: number };
+	}
+
+	const [usageStats, setUsageStats] = useState<UsageStats>(() => {
+		if (typeof window !== 'undefined') {
+			const saved = localStorage.getItem('swift-sage-usage');
+			return saved ? JSON.parse(saved) : {
+				groq: { calls: 0, estimatedCost: 0 },
+				openai: { calls: 0, estimatedCost: 0 },
+				claude: { calls: 0, estimatedCost: 0 },
+				gemini: { calls: 0, estimatedCost: 0 },
+				cartesia: { calls: 0, estimatedCost: 0 },
+				'openai-tts': { calls: 0, estimatedCost: 0 },
+			};
+		}
+		return {
+			groq: { calls: 0, estimatedCost: 0 },
+			openai: { calls: 0, estimatedCost: 0 },
+			claude: { calls: 0, estimatedCost: 0 },
+			gemini: { calls: 0, estimatedCost: 0 },
+			cartesia: { calls: 0, estimatedCost: 0 },
+			'openai-tts': { calls: 0, estimatedCost: 0 },
+		};
+	});
+
+	// Cost estimation (rough estimates per request)
+	const PRICING = {
+		groq: 0, // Free
+		openai: 0.015, // ~$0.015 per LLM request
+		claude: 0.025, // ~$0.025 per LLM request
+		gemini: 0.012, // ~$0.012 per LLM request
+		cartesia: 0.05, // ~$0.05 per TTS request
+		'openai-tts': 0.03, // ~$0.03 per TTS request
+		webspeech: 0, // Free
+	};
+
+	// Track usage function
+	const trackUsage = (provider: string) => {
+		const cost = PRICING[provider] || 0;
+		
+		setUsageStats(prev => {
+			const updated = {
+				...prev,
+				[provider]: {
+					calls: prev[provider].calls + 1,
+					estimatedCost: prev[provider].estimatedCost + cost,
+				}
+			};
+			
+			localStorage.setItem('swift-sage-usage', JSON.stringify(updated));
+			return updated;
+		});
+	};
+
+	// Reset usage
+	const resetUsage = () => {
+		const resetStats = Object.keys(usageStats).reduce((acc, key) => {
+			acc[key] = { calls: 0, estimatedCost: 0 };
+			return acc;
+		}, {} as UsageStats);
+		
+		setUsageStats(resetStats);
+		localStorage.setItem('swift-sage-usage', JSON.stringify(resetStats));
+	};
+
 	// TWEAK 1: Add Simple Stop Controls (Essential)
 	const [isListening, setIsListening] = useState(false);
 	const [isManuallyPaused, setIsManuallyPaused] = useState(false);
@@ -101,7 +177,23 @@ export default function TestV2() {
 
 	// ADD: Simple interruption (your idea)
 	const interruptSpeech = () => {
+		console.log("⏹️ Interrupting speech...");
+		
+		// Stop current speech immediately
 		speechSynthesis.cancel();
+		
+		// CRITICAL: Restart VAD after brief delay
+		setTimeout(() => {
+			if (vad && !isManuallyPaused) {
+				console.log("🎤 Restarting VAD after interrupt");
+				vad.start();
+				setIsListening(true);
+			}
+		}, 200); // Slightly longer delay for reliability
+		
+		// Clear any pending states
+		setInput("");
+		setIsLoading(false);
 	};
 
 	// TWEAK 3: Clean Audio (Strip Icons from TTS)
@@ -187,6 +279,18 @@ export default function TestV2() {
 
 		// ADD: Send provider choice
 		formData.append("useWebSpeech", useWebSpeech.toString());
+
+		// STAGE 2: Send both provider choices and track usage
+		formData.append("llmProvider", llmProvider);
+		formData.append("ttsProvider", ttsProvider);
+
+		// Track LLM usage
+		trackUsage(llmProvider);
+		
+		// Track TTS usage (if not free)
+		if (ttsProvider !== 'webspeech') {
+			trackUsage(ttsProvider);
+		}
 
 		for (const message of prevMessages) {
 			formData.append("message", JSON.stringify(message));
@@ -334,6 +438,74 @@ export default function TestV2() {
 						/>
 						🆓 Use Free Web Speech (uncheck to use Cartesia if you have credits)
 					</label>
+				</div>
+
+				{/* STAGE 2: Enhanced UI with Dual Provider Selection */}
+				<div className="mb-4 space-y-4">
+					{/* LLM (Brain) Provider Selection */}
+					<div className="p-3 bg-purple-50 border border-purple-200 rounded">
+						<label className="block text-sm font-medium mb-2">🧠 AI Brain Provider:</label>
+						<select 
+							value={llmProvider} 
+							onChange={(e) => setLlmProvider(e.target.value)}
+							className="w-full px-3 py-1 border rounded"
+						>
+							<option value="groq">⚡ Groq Llama-3 (Free, Fast)</option>
+							<option value="openai">🧠 OpenAI GPT-4 (Reliable, ~$0.015/call)</option>
+							<option value="claude">🎯 Claude 3 (Smart, ~$0.025/call)</option>
+							<option value="gemini">🔍 Google Gemini (Fast, ~$0.012/call)</option>
+						</select>
+					</div>
+					
+					{/* TTS (Voice) Provider Selection */}
+					<div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
+						<label className="block text-sm font-medium mb-2">🗣️ Voice Provider:</label>
+						<select 
+							value={ttsProvider} 
+							onChange={(e) => setTtsProvider(e.target.value)}
+							className="w-full px-3 py-1 border rounded"
+						>
+							<option value="webspeech">🆓 Web Speech (Free, Browser)</option>
+							<option value="cartesia">💰 Cartesia (Premium, ~$0.05/call)</option>
+							<option value="openai-tts">🎤 OpenAI TTS (Quality, ~$0.03/call)</option>
+						</select>
+					</div>
+					
+					{/* Current Status & Cost Tracking */}
+					<div className="p-3 bg-gray-50 border border-gray-200 rounded">
+						<div className="flex items-center justify-between mb-2">
+							<div className="text-sm">
+								<strong>Current:</strong> 🧠 {llmProvider.toUpperCase()} | 🗣️ {ttsProvider.toUpperCase()}
+							</div>
+							<button
+								onClick={resetUsage}
+								className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 border rounded"
+							>
+								Reset Usage
+							</button>
+						</div>
+						
+						<div className="grid grid-cols-2 gap-3 text-xs">
+							<div>
+								<div className="font-medium mb-1">🧠 LLM Usage:</div>
+								<div>Groq: {usageStats.groq.calls} calls (FREE)</div>
+								<div>OpenAI: {usageStats.openai.calls} calls (${usageStats.openai.estimatedCost.toFixed(3)})</div>
+								<div>Claude: {usageStats.claude.calls} calls (${usageStats.claude.estimatedCost.toFixed(3)})</div>
+								<div>Gemini: {usageStats.gemini.calls} calls (${usageStats.gemini.estimatedCost.toFixed(3)})</div>
+							</div>
+							
+							<div>
+								<div className="font-medium mb-1">🗣️ TTS Usage:</div>
+								<div>Web Speech: ∞ (FREE)</div>
+								<div>Cartesia: {usageStats.cartesia.calls} calls (${usageStats.cartesia.estimatedCost.toFixed(3)})</div>
+								<div>OpenAI TTS: {usageStats['openai-tts'].calls} calls (${usageStats['openai-tts'].estimatedCost.toFixed(3)})</div>
+							</div>
+						</div>
+						
+						<div className="mt-2 pt-2 border-t text-sm font-medium text-center">
+							💰 Total Session Cost: ${Object.values(usageStats).reduce((sum, stat) => sum + stat.estimatedCost, 0).toFixed(3)}
+						</div>
+					</div>
 				</div>
 
 				{/* NEW: Simple stop controls */}

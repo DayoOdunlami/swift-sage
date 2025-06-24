@@ -2,13 +2,15 @@
 // This file is a carbon copy of the main API route for safe tool integration experiments.
 
 import Groq from "groq-sdk";
+import OpenAI from "openai";
 import { headers } from "next/headers";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
 import { after } from "next/server";
 import { tools, createTask, listTasks, completeTask, updateTask, deleteTask, getProjects } from "../../../lib/todoist";
 
-const groq = new Groq();
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const schema = zfd.formData({
 	input: z.union([zfd.text(), zfd.file()]),
@@ -31,6 +33,172 @@ const tool_functions = {
 	deleteTask,
 };
 
+// STAGE 3: API key validation and graceful errors
+function validateAPIKeys() {
+	const keys = {
+		groq: !!process.env.GROQ_API_KEY,
+		openai: !!process.env.OPENAI_API_KEY,
+		claude: !!process.env.ANTHROPIC_API_KEY,
+		gemini: !!process.env.GEMINI_API_KEY,
+		cartesia: !!process.env.CARTESIA_API_KEY,
+	};
+	
+	console.log("🔑 API Key Status:", keys);
+	return keys;
+}
+
+// LLM provider abstraction
+async function callLLM(provider: string, messages: any[], tools: any[]) {
+	const apiKeys = validateAPIKeys();
+	
+	if (!apiKeys[provider]) {
+		console.warn(`⚠️ ${provider.toUpperCase()} API key not configured`);
+		return {
+			choices: [{
+				message: {
+					content: `⚠️ ${provider.toUpperCase()} is not configured. Please add the API key in settings, or switch to a different provider.`,
+					tool_calls: null
+				}
+			}]
+		};
+	}
+	
+	try {
+		console.log(`🧠 Using ${provider.toUpperCase()} for AI processing...`);
+		
+		switch(provider) {
+			case 'groq':
+				return await groq.chat.completions.create({
+					messages, model: "llama3-8b-8192", tools, tool_choice: "auto"
+				});
+				
+			case 'openai':
+				return await openai.chat.completions.create({
+					messages, model: "gpt-4o-mini", tools, tool_choice: "auto"
+				});
+				
+			case 'claude':
+				throw new Error("Claude integration coming soon. Try OpenAI or Groq.");
+				
+			case 'gemini':
+				throw new Error("Gemini integration coming soon. Try OpenAI or Groq.");
+				
+			default:
+				throw new Error(`Unknown provider: ${provider}`);
+		}
+		
+	} catch (error) {
+		console.error(`❌ ${provider.toUpperCase()} API Error:`, error);
+		
+		// Provide helpful error messages
+		if (error.message?.includes('401')) {
+			return {
+				choices: [{
+					message: {
+						content: `🔑 ${provider.toUpperCase()} API key is invalid. Please check your configuration.`,
+						tool_calls: null
+					}
+				}]
+			};
+		}
+		
+		if (error.message?.includes('quota') || error.message?.includes('limit')) {
+			return {
+				choices: [{
+					message: {
+						content: `💳 ${provider.toUpperCase()} has reached its usage limit. Try switching to a different provider.`,
+						tool_calls: null
+					}
+				}]
+			};
+		}
+		
+		return {
+			choices: [{
+				message: {
+					content: `❌ ${provider.toUpperCase()} error: ${error.message}. Try switching to a different provider.`,
+					tool_calls: null
+				}
+			}]
+		};
+	}
+}
+
+// TTS provider abstraction
+async function generateTTS(text: string, provider: string) {
+	const apiKeys = validateAPIKeys();
+	
+	if (provider !== 'webspeech' && !apiKeys[provider]) {
+		console.warn(`⚠️ ${provider.toUpperCase()} not configured, falling back to Web Speech`);
+		return new Response(text, {
+			headers: { "Content-Type": "text/plain", "X-TTS-Provider": "webspeech" }
+		});
+	}
+	
+	try {
+		console.log(`🗣️ Using ${provider.toUpperCase()} for speech generation...`);
+		
+		switch(provider) {
+			case 'webspeech':
+				return new Response(text, {
+					headers: { "Content-Type": "text/plain", "X-TTS-Provider": "webspeech" }
+				});
+				
+			case 'cartesia':
+				// Existing Cartesia code
+				const voice = await fetch("https://api.cartesia.ai/tts/bytes", {
+					method: "POST",
+					headers: {
+						"Cartesia-Version": "2024-06-30",
+						"Content-Type": "application/json",
+						"X-API-Key": process.env.CARTESIA_API_KEY!,
+					},
+					body: JSON.stringify({
+						model_id: "sonic-english",
+						transcript: text,
+						voice: {
+							mode: "id",
+							id: "79a125e8-cd45-4c13-8a67-188112f4dd22",
+						},
+						output_format: {
+							container: "raw",
+							encoding: "pcm_f32le",
+							sample_rate: 24000,
+						},
+					}),
+				});
+
+				if (!voice.ok) {
+					console.error(await voice.text());
+					return new Response("Voice synthesis failed", { status: 500 });
+				}
+
+				return new Response(voice.body, {
+					headers: { "Content-Type": "audio/wav" }
+				});
+				
+			case 'openai-tts':
+				const mp3 = await openai.audio.speech.create({
+					model: "tts-1",
+					voice: "alloy",
+					input: text,
+				});
+				const buffer = Buffer.from(await mp3.arrayBuffer());
+				return new Response(buffer, {
+					headers: { "Content-Type": "audio/mpeg" }
+				});
+				
+			default:
+				throw new Error(`Unknown TTS provider: ${provider}`);
+		}
+	} catch (error) {
+		console.warn(`⚠️ ${provider.toUpperCase()} TTS failed, falling back to Web Speech:`, error);
+		return new Response(text, {
+			headers: { "Content-Type": "text/plain", "X-TTS-Provider": "webspeech" }
+		});
+	}
+}
+
 export async function POST(request: Request) {
 	console.time("transcribe " + request.headers.get("x-vercel-id") || "local");
 
@@ -41,8 +209,9 @@ export async function POST(request: Request) {
 	const transcript = await getTranscript(data.input);
 	if (!transcript) return new Response("Invalid audio", { status: 400 });
 
-	// ADD: Get provider choice from form data
-	const useWebSpeech = formData.get("useWebSpeech") !== "false"; // Default to true (free)
+	// STAGE 2: Get provider choices from form data
+	const llmProvider = formData.get("llmProvider") || "groq";
+	const ttsProvider = formData.get("ttsProvider") || "webspeech";
 
 	console.timeEnd(
 		"transcribe " + request.headers.get("x-vercel-id") || "local"
@@ -51,15 +220,13 @@ export async function POST(request: Request) {
 		"ai processing " + request.headers.get("x-vercel-id") || "local"
 	);
 
-	// Use Groq for AI processing
+	// Use selected LLM provider
 	let response: string;
 	try {
-		const completion = await groq.chat.completions.create({
-			model: "llama3-8b-8192",
-			messages: [
-				{
-					role: "system",
-					content: `You are Swift Sage, a helpful voice assistant with access to the user's Todoist account.
+		const completion = await callLLM(llmProvider, [
+			{
+				role: "system",
+				content: `You are Swift Sage, a helpful voice assistant with access to the user's Todoist account.
 
 CRITICAL TOOL USAGE RULES:
 1. When user asks about "my tasks", "my data", or personal information - ALWAYS use the available tools first
@@ -75,17 +242,16 @@ RESPONSE FORMATTING:
 
 AVAILABLE TOOLS: createTask, listTasks, completeTask, updateTask, deleteTask, getProjects
 
+Current AI: ${llmProvider.toUpperCase()} | Current Voice: ${ttsProvider.toUpperCase()}
+
 When in doubt, use the tools to get real data rather than guessing or making examples.`,
-				},
-				...data.message,
-				{
-					role: "user",
-					content: transcript,
-				},
-			],
-			tools,
-			tool_choice: "auto",
-		});
+			},
+			...data.message,
+			{
+				role: "user",
+				content: transcript,
+			},
+		], tools);
 
 		let final_response = completion.choices[0].message.content;
 		const tool_calls = completion.choices[0].message.tool_calls;
@@ -129,66 +295,8 @@ When in doubt, use the tools to get real data rather than guessing or making exa
 
 	if (!response) return new Response("Invalid response", { status: 500 });
 
-	// REPLACE: The entire Cartesia TTS section with provider logic
-	if (useWebSpeech) {
-		// Web Speech API (free) - return text for browser TTS
-		return new Response(response, {
-			headers: {
-				"Content-Type": "text/plain",
-				"X-TTS-Provider": "webspeech",
-				"X-Transcript": encodeURIComponent(transcript),
-				"X-Response": encodeURIComponent(response),
-			},
-		});
-	} else {
-		// Cartesia TTS (paid) - keep existing Cartesia code here
-		console.time(
-			"cartesia request " + request.headers.get("x-vercel-id") || "local"
-		);
-
-		const voice = await fetch("https://api.cartesia.ai/tts/bytes", {
-			method: "POST",
-			headers: {
-				"Cartesia-Version": "2024-06-30",
-				"Content-Type": "application/json",
-				"X-API-Key": process.env.CARTESIA_API_KEY!,
-			},
-			body: JSON.stringify({
-				model_id: "sonic-english",
-				transcript: response,
-				voice: {
-					mode: "id",
-					id: "79a125e8-cd45-4c13-8a67-188112f4dd22",
-				},
-				output_format: {
-					container: "raw",
-					encoding: "pcm_f32le",
-					sample_rate: 24000,
-				},
-			}),
-		});
-
-		console.timeEnd(
-			"cartesia request " + request.headers.get("x-vercel-id") || "local"
-		);
-
-		if (!voice.ok) {
-			console.error(await voice.text());
-			return new Response("Voice synthesis failed", { status: 500 });
-		}
-
-		console.time("stream " + request.headers.get("x-vercel-id") || "local");
-		after(() => {
-			console.timeEnd("stream " + request.headers.get("x-vercel-id") || "local");
-		});
-
-		return new Response(voice.body, {
-			headers: {
-				"X-Transcript": encodeURIComponent(transcript),
-				"X-Response": encodeURIComponent(response),
-			},
-		});
-	}
+	// Use selected TTS provider
+	return await generateTTS(response, ttsProvider);
 }
 
 async function location() {
