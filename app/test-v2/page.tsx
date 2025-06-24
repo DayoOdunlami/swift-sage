@@ -100,14 +100,40 @@ export default function TestV2() {
 
 		// ADD: Handle Web Speech response
 		if (response.headers.get("X-TTS-Provider") === "webspeech") {
+			const text = await response.text();
+			
+			// CRITICAL: Stop VAD before TTS to prevent feedback loop
+			if (vad) {
+				vad.pause();
+			}
+			
 			if ('speechSynthesis' in window) {
 				const utterance = new SpeechSynthesisUtterance(text);
 				utterance.rate = 1.0;
 				utterance.pitch = 1.0;
+				
+				// CRITICAL: Restart VAD only after TTS finishes
+				utterance.onend = () => {
+					setTimeout(() => {
+						if (vad) {
+							vad.start();
+						}
+					}, 500); // Small delay to ensure TTS is completely done
+				};
+				
+				utterance.onerror = () => {
+					// Restart VAD even if TTS fails
+					if (vad) {
+						vad.start();
+					}
+				};
+				
 				speechSynthesis.speak(utterance);
 			}
-			setInput(transcript);
-
+			
+			// CRITICAL: Clear the input field after processing
+			setInput("");
+			
 			return [
 				...prevMessages,
 				{
@@ -133,7 +159,9 @@ export default function TestV2() {
 			const isFirefox = navigator.userAgent.includes("Firefox");
 			if (isFirefox) vad.start();
 		});
-		setInput(transcript);
+		
+		// CRITICAL: Clear the input field after processing
+		setInput("");
 
 		return [
 			...prevMessages,
@@ -152,7 +180,15 @@ export default function TestV2() {
 	function handleFormSubmit(e: React.FormEvent) {
 		e.preventDefault();
 		startTransition(() => submit(input));
+		// CRITICAL: Clear input field after submission
+		setInput("");
 	}
+
+	// ADD: Debug logging to understand VAD behavior (temporary)
+	useEffect(() => {
+		console.log("VAD State:", vad ? "Active" : "Inactive");
+		console.log("Input:", input);
+	}, [vad, input]);
 
 	return (
 		<>
