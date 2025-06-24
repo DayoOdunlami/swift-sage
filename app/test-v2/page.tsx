@@ -69,6 +69,7 @@ export default function TestV2() {
 
 	// ADD: Provider state
 	const [useWebSpeech, setUseWebSpeech] = useState(true);
+	const [llmProvider, setLlmProvider] = useState<'groq' | 'openai'>('groq');
 
 	// TWEAK 1: Add Simple Stop Controls (Essential)
 	const [isListening, setIsListening] = useState(false);
@@ -187,6 +188,7 @@ export default function TestV2() {
 
 		// ADD: Send provider choice
 		formData.append("useWebSpeech", useWebSpeech.toString());
+		formData.append("llmProvider", llmProvider);
 
 		for (const message of prevMessages) {
 			formData.append("message", JSON.stringify(message));
@@ -335,6 +337,19 @@ export default function TestV2() {
 						/>
 						🆓 Use Free Web Speech (uncheck to use Cartesia if you have credits)
 					</label>
+				</div>
+
+				{/* Add provider selection dropdown before the recording button and after the Web Speech toggle */}
+				<div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+					<label className="block text-sm font-medium mb-2">🧠 AI Brain:</label>
+					<select 
+						value={llmProvider} 
+						onChange={(e) => setLlmProvider(e.target.value as 'groq' | 'openai')}
+						className="w-full px-3 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+					>
+						<option value="groq">⚡ Groq (Free, Sometimes Unreliable)</option>
+						<option value="openai">🧠 OpenAI (Paid, More Reliable)</option>
+					</select>
 				</div>
 
 				{/* NEW: Simple stop controls */}
