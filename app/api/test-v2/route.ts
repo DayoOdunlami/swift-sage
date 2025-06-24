@@ -34,11 +34,15 @@ const tool_functions = {
 export async function POST(request: Request) {
 	console.time("transcribe " + request.headers.get("x-vercel-id") || "local");
 
-	const { data, success } = schema.safeParse(await request.formData());
+	const formData = await request.formData();
+	const { data, success } = schema.safeParse(formData);
 	if (!success) return new Response("Invalid request", { status: 400 });
 
 	const transcript = await getTranscript(data.input);
 	if (!transcript) return new Response("Invalid audio", { status: 400 });
+
+	// ADD: Get provider choice from form data
+	const useWebSpeech = formData.get("useWebSpeech") !== "false"; // Default to true (free)
 
 	console.timeEnd(
 		"transcribe " + request.headers.get("x-vercel-id") || "local"
@@ -98,52 +102,66 @@ export async function POST(request: Request) {
 
 	if (!response) return new Response("Invalid response", { status: 500 });
 
-	console.time(
-		"cartesia request " + request.headers.get("x-vercel-id") || "local"
-	);
-
-	const voice = await fetch("https://api.cartesia.ai/tts/bytes", {
-		method: "POST",
-		headers: {
-			"Cartesia-Version": "2024-06-30",
-			"Content-Type": "application/json",
-			"X-API-Key": process.env.CARTESIA_API_KEY!,
-		},
-		body: JSON.stringify({
-			model_id: "sonic-english",
-			transcript: response,
-			voice: {
-				mode: "id",
-				id: "79a125e8-cd45-4c13-8a67-188112f4dd22",
+	// REPLACE: The entire Cartesia TTS section with provider logic
+	if (useWebSpeech) {
+		// Web Speech API (free) - return text for browser TTS
+		return new Response(response, {
+			headers: {
+				"Content-Type": "text/plain",
+				"X-TTS-Provider": "webspeech",
+				"X-Transcript": encodeURIComponent(transcript),
+				"X-Response": encodeURIComponent(response),
 			},
-			output_format: {
-				container: "raw",
-				encoding: "pcm_f32le",
-				sample_rate: 24000,
+		});
+	} else {
+		// Cartesia TTS (paid) - keep existing Cartesia code here
+		console.time(
+			"cartesia request " + request.headers.get("x-vercel-id") || "local"
+		);
+
+		const voice = await fetch("https://api.cartesia.ai/tts/bytes", {
+			method: "POST",
+			headers: {
+				"Cartesia-Version": "2024-06-30",
+				"Content-Type": "application/json",
+				"X-API-Key": process.env.CARTESIA_API_KEY!,
 			},
-		}),
-	});
+			body: JSON.stringify({
+				model_id: "sonic-english",
+				transcript: response,
+				voice: {
+					mode: "id",
+					id: "79a125e8-cd45-4c13-8a67-188112f4dd22",
+				},
+				output_format: {
+					container: "raw",
+					encoding: "pcm_f32le",
+					sample_rate: 24000,
+				},
+			}),
+		});
 
-	console.timeEnd(
-		"cartesia request " + request.headers.get("x-vercel-id") || "local"
-	);
+		console.timeEnd(
+			"cartesia request " + request.headers.get("x-vercel-id") || "local"
+		);
 
-	if (!voice.ok) {
-		console.error(await voice.text());
-		return new Response("Voice synthesis failed", { status: 500 });
+		if (!voice.ok) {
+			console.error(await voice.text());
+			return new Response("Voice synthesis failed", { status: 500 });
+		}
+
+		console.time("stream " + request.headers.get("x-vercel-id") || "local");
+		after(() => {
+			console.timeEnd("stream " + request.headers.get("x-vercel-id") || "local");
+		});
+
+		return new Response(voice.body, {
+			headers: {
+				"X-Transcript": encodeURIComponent(transcript),
+				"X-Response": encodeURIComponent(response),
+			},
+		});
 	}
-
-	console.time("stream " + request.headers.get("x-vercel-id") || "local");
-	after(() => {
-		console.timeEnd("stream " + request.headers.get("x-vercel-id") || "local");
-	});
-
-	return new Response(voice.body, {
-		headers: {
-			"X-Transcript": encodeURIComponent(transcript),
-			"X-Response": encodeURIComponent(response),
-		},
-	});
 }
 
 async function location() {

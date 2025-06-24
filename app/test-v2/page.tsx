@@ -42,6 +42,9 @@ export default function TestV2() {
 		minSpeechFrames: 4,
 	});
 
+	// ADD: Provider state
+	const [useWebSpeech, setUseWebSpeech] = useState(true);
+
 	useEffect(() => {
 		function keyDown(e: KeyboardEvent) {
 			if (e.key === "Enter") return inputRef.current?.focus();
@@ -66,6 +69,9 @@ export default function TestV2() {
 			track("Speech input");
 		}
 
+		// ADD: Send provider choice
+		formData.append("useWebSpeech", useWebSpeech.toString());
+
 		for (const message of prevMessages) {
 			formData.append("message", JSON.stringify(message));
 		}
@@ -82,13 +88,43 @@ export default function TestV2() {
 		);
 		const text = decodeURIComponent(response.headers.get("X-Response") || "");
 
-		if (!response.ok || !transcript || !text || !response.body) {
+		if (!response.ok || !transcript || !text) {
 			if (response.status === 429) {
 				toast.error("Too many requests. Please try again later.");
 			} else {
 				toast.error((await response.text()) || "An error occurred.");
 			}
 
+			return prevMessages;
+		}
+
+		// ADD: Handle Web Speech response
+		if (response.headers.get("X-TTS-Provider") === "webspeech") {
+			if ('speechSynthesis' in window) {
+				const utterance = new SpeechSynthesisUtterance(text);
+				utterance.rate = 1.0;
+				utterance.pitch = 1.0;
+				speechSynthesis.speak(utterance);
+			}
+			setInput(transcript);
+
+			return [
+				...prevMessages,
+				{
+					role: "user",
+					content: transcript,
+				},
+				{
+					role: "assistant",
+					content: text,
+					latency: Date.now() - submittedAt,
+				},
+			];
+		}
+
+		// Continue with existing audio blob handling for Cartesia
+		if (!response.body) {
+			toast.error("No response body received.");
 			return prevMessages;
 		}
 
@@ -147,6 +183,19 @@ export default function TestV2() {
 					</Link>
 				</div>
 				<div className="pb-4 min-h-28" />
+
+				{/* ADD: Provider toggle UI */}
+				<div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+					<label className="flex items-center">
+						<input
+							type="checkbox"
+							checked={useWebSpeech}
+							onChange={(e) => setUseWebSpeech(e.target.checked)}
+							className="mr-2"
+						/>
+						🆓 Use Free Web Speech (uncheck to use Cartesia if you have credits)
+					</label>
+				</div>
 
 				<div className="w-full max-w-2xl">
 					<Messages
