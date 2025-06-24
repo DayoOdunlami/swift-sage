@@ -59,11 +59,23 @@ export async function POST(request: Request) {
 			messages: [
 				{
 					role: "system",
-					content: `You are Swift Sage, a smart AI assistant with Todoist task management capabilities.
-					You can create, list, complete, update, and delete tasks through voice commands.
-					Respond briefly and naturally to voice commands.
-					User location is ${await location()}.
-					The current time is ${await time()}.`,
+					content: `You are Swift Sage, a helpful voice assistant with access to the user's Todoist account.
+
+CRITICAL TOOL USAGE RULES:
+1. When user asks about "my tasks", "my data", or personal information - ALWAYS use the available tools first
+2. NEVER make up fake personal data or tasks
+3. If tools fail or return no data, explain the failure clearly: "I couldn't access your Todoist data. Please check manually."
+4. NEVER auto-list tasks - ask permission first: "Found X tasks. Would you like me to list them?"
+5. Always prefer real data over examples
+
+RESPONSE FORMATTING:
+- Keep responses conversational and natural
+- Don't mention technical details about API calls
+- Focus on the user's actual data and tasks
+
+AVAILABLE TOOLS: createTask, listTasks, completeTask, updateTask, deleteTask, getProjects
+
+When in doubt, use the tools to get real data rather than guessing or making examples.`,
 				},
 				...data.message,
 				{
@@ -79,15 +91,30 @@ export async function POST(request: Request) {
 		const tool_calls = completion.choices[0].message.tool_calls;
 
 		if (tool_calls && tool_calls.length > 0) {
+			let tool_results = [];
+			
 			for (const tool_call of tool_calls) {
 				const function_name = tool_call.function.name;
 				const function_args = JSON.parse(tool_call.function.arguments);
 				
-				if (tool_functions[function_name]) {
-					const result = await tool_functions[function_name](function_args);
-					final_response = result;
+				// Keep existing tool indicators (user said they were fine)
+				let tool_indicator = "";
+				switch(function_name) {
+					case 'listTasks': tool_indicator = "🔍 Checking your Todoist tasks..."; break;
+					case 'createTask': tool_indicator = "✅ Creating task in Todoist..."; break;
+					case 'completeTask': tool_indicator = "✔️ Completing task in Todoist..."; break;
+					case 'updateTask': tool_indicator = "📝 Updating task in Todoist..."; break;
+					case 'deleteTask': tool_indicator = "🗑️ Deleting task from Todoist..."; break;
+					default: tool_indicator = "🔧 Using Todoist API...";
 				}
+				
+				const result = await tool_functions[function_name](function_args);
+				const clean_result = result.replace(/\/tool-use.*?\/tool-use/g, '').trim();
+				
+				tool_results.push(`${tool_indicator}\n\n📊 **Real Data from Your Todoist:**\n${clean_result}`);
 			}
+			
+			final_response = tool_results.join('\n\n');
 		}
 
 		response = final_response || "I'm not sure how to help with that.";

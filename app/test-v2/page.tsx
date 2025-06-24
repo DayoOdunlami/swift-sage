@@ -24,19 +24,44 @@ type Message = {
 	latency?: number;
 };
 
+// TWEAK 2: Fix Visual Contrast (Green → Blue)
+// REUSE: Visual data indicators from previous code
+// TWEAK: Change green to blue for better contrast
+const renderMessage = (content: string) => {
+	if (content.includes('📊 **Real Data from Your Todoist:**')) {
+		return (
+			<div className="bg-blue-50 border-l-4 border-blue-400 p-3 rounded">
+				<div className="flex items-center mb-2">
+					<span className="text-blue-700 font-medium">📊 Real Data</span>
+				</div>
+				<div className="text-blue-900">{content}</div>
+			</div>
+		);
+	}
+	
+	return <div className="whitespace-pre-wrap">{content}</div>;
+};
+
 export default function TestV2() {
 	const [input, setInput] = useState("");
 	const inputRef = useRef<HTMLInputElement>(null);
 	const player = usePlayer();
 	const vad = useMicVAD({
 		startOnLoad: true,
+		onSpeechStart: () => {
+			console.log("Speech start detected");
+			setIsListening(true);
+		},
 		onSpeechEnd: (audio: any) => {
-			player.stop();
-			const wav = utils.encodeWAV(audio);
-			const blob = new Blob([wav], { type: "audio/wav" });
-			startTransition(() => submit(blob));
-			const isFirefox = navigator.userAgent.includes("Firefox");
-			if (isFirefox) vad.pause();
+			if (!isManuallyPaused) {
+				console.log("Speech end detected");
+				player.stop();
+				const wav = utils.encodeWAV(audio);
+				const blob = new Blob([wav], { type: "audio/wav" });
+				startTransition(() => submit(blob));
+				const isFirefox = navigator.userAgent.includes("Firefox");
+				if (isFirefox) vad.pause();
+			}
 		},
 		positiveSpeechThreshold: 0.6,
 		minSpeechFrames: 4,
@@ -45,15 +70,106 @@ export default function TestV2() {
 	// ADD: Provider state
 	const [useWebSpeech, setUseWebSpeech] = useState(true);
 
-	useEffect(() => {
-		function keyDown(e: KeyboardEvent) {
-			if (e.key === "Enter") return inputRef.current?.focus();
-			if (e.key === "Escape") return setInput("");
-		}
+	// TWEAK 1: Add Simple Stop Controls (Essential)
+	const [isListening, setIsListening] = useState(false);
+	const [isManuallyPaused, setIsManuallyPaused] = useState(false);
 
-		window.addEventListener("keydown", keyDown);
-		return () => window.removeEventListener("keydown", keyDown);
-	});
+	// ADD: Stop control functions
+	const stopListening = () => {
+		if (vad) {
+			vad.pause();
+		}
+		setIsListening(false);
+		setIsManuallyPaused(true);
+	};
+
+	const startListening = () => {
+		if (vad) {
+			vad.start();
+		}
+		setIsListening(true);
+		setIsManuallyPaused(false);
+	};
+
+	const toggleListening = () => {
+		if (isListening) {
+			stopListening();
+		} else {
+			startListening();
+		}
+	};
+
+	// ADD: Simple interruption (your idea)
+	const interruptSpeech = () => {
+		speechSynthesis.cancel();
+	};
+
+	// TWEAK 3: Clean Audio (Strip Icons from TTS)
+	// ADD: Function to clean text for speech
+	const cleanTextForTTS = (text: string): string => {
+		return text
+			.replace(/📊|🔍|✅|🗑️|📝|⚠️|🔧|✔️/g, '') // Remove icons
+			.replace(/\*\*Real Data from Your Todoist:\*\*/g, 'Real data from your Todoist:')
+			.replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold formatting
+			.trim();
+	};
+
+	// TWEAK 7: Update VAD to Track State
+	useEffect(() => {
+		console.log("VAD State:", vad ? "Active" : "Inactive");
+		console.log("Input:", input);
+	}, [vad, input]);
+
+	// TWEAK 5: Voice Commands (Stop + Interrupt)
+	// ADD: Voice command detection to existing transcript processing
+	useEffect(() => {
+		if (input) {
+			const lowerInput = input.toLowerCase().trim();
+			
+			// LESSON LEARNED: Check stop commands first
+			const stopCommands = ['stop', 'pause', 'quiet', 'stop listening'];
+			if (stopCommands.some(cmd => lowerInput.includes(cmd))) {
+				stopListening();
+				setInput("");
+				return;
+			}
+			
+			// Simple interrupt commands
+			const interruptCommands = ['interrupt', 'cancel'];
+			if (interruptCommands.some(cmd => lowerInput.includes(cmd))) {
+				interruptSpeech();
+				setInput("");
+				return;
+			}
+		}
+	}, [input]);
+
+	// TWEAK 4: Safe Keyboard (ESC Only, No Spacebar)
+	// ADD: Safe keyboard shortcuts that don't break typing
+	useEffect(() => {
+		const handleKeyPress = (event: KeyboardEvent) => {
+			// LESSON LEARNED: Only when NOT typing in input fields
+			const target = event.target as HTMLElement;
+			const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+			
+			if (!isTyping) {
+				// LESSON LEARNED: ESC only (no spacebar to avoid typing conflicts)
+				if (event.code === 'Escape') {
+					event.preventDefault();
+					toggleListening();
+				}
+				
+				// Simple interrupt with Tab
+				if (event.code === 'Tab') {
+					event.preventDefault();
+					interruptSpeech();
+				}
+			}
+		};
+
+		window.addEventListener('keydown', handleKeyPress);
+		return () => window.removeEventListener('keydown', handleKeyPress);
+	}, []);
 
 	const [messages, submit, isPending] = useActionState<
 		Array<Message>,
@@ -98,40 +214,33 @@ export default function TestV2() {
 			return prevMessages;
 		}
 
-		// ADD: Handle Web Speech response
+		// TWEAK 3: Clean Audio (Strip Icons from TTS)
+		// MODIFY: Web Speech handling to use clean text
 		if (response.headers.get("X-TTS-Provider") === "webspeech") {
 			const text = await response.text();
+			const cleanText = cleanTextForTTS(text);
 			
-			// CRITICAL: Stop VAD before TTS to prevent feedback loop
+			// Keep existing simple loop prevention (this works!)
 			if (vad) {
 				vad.pause();
 			}
 			
 			if ('speechSynthesis' in window) {
-				const utterance = new SpeechSynthesisUtterance(text);
+				const utterance = new SpeechSynthesisUtterance(cleanText);
 				utterance.rate = 1.0;
 				utterance.pitch = 1.0;
 				
-				// CRITICAL: Restart VAD only after TTS finishes
 				utterance.onend = () => {
 					setTimeout(() => {
 						if (vad) {
 							vad.start();
 						}
-					}, 500); // Small delay to ensure TTS is completely done
-				};
-				
-				utterance.onerror = () => {
-					// Restart VAD even if TTS fails
-					if (vad) {
-						vad.start();
-					}
+					}, 500);
 				};
 				
 				speechSynthesis.speak(utterance);
 			}
 			
-			// CRITICAL: Clear the input field after processing
 			setInput("");
 			
 			return [
@@ -184,12 +293,6 @@ export default function TestV2() {
 		setInput("");
 	}
 
-	// ADD: Debug logging to understand VAD behavior (temporary)
-	useEffect(() => {
-		console.log("VAD State:", vad ? "Active" : "Inactive");
-		console.log("Input:", input);
-	}, [vad, input]);
-
 	return (
 		<>
 			<title>Swift Sage - Test V2</title>
@@ -233,11 +336,41 @@ export default function TestV2() {
 					</label>
 				</div>
 
+				{/* NEW: Simple stop controls */}
+				<div className="mb-4 flex items-center space-x-3">
+					<button
+						onClick={toggleListening}
+						className={`px-4 py-2 rounded font-medium ${
+							isListening 
+								? 'bg-red-500 text-white hover:bg-red-600' 
+								: 'bg-green-500 text-white hover:bg-green-600'
+						}`}
+					>
+						{isListening ? '🛑 Stop Listening' : '🎤 Start Listening'}
+					</button>
+					
+					<button
+						onClick={interruptSpeech}
+						className="px-4 py-2 bg-orange-500 text-white rounded font-medium hover:bg-orange-600"
+					>
+						⏹️ Interrupt
+					</button>
+					
+					<div className={`px-3 py-1 rounded text-sm ${
+						isListening 
+							? 'bg-red-100 text-red-700' 
+							: 'bg-gray-100 text-gray-700'
+					}`}>
+						{isListening ? '🎤 Listening...' : '⏸️ Paused'}
+					</div>
+				</div>
+
 				<div className="w-full max-w-2xl">
 					<Messages
 						messages={messages}
 						isPending={isPending}
 						submit={submit}
+						renderMessage={renderMessage}
 					/>
 				</div>
 
@@ -321,10 +454,12 @@ function Messages({
 	messages,
 	isPending,
 	submit,
+	renderMessage,
 }: {
 	messages: Array<Message>;
 	isPending: boolean;
 	submit: (data: string) => void;
+	renderMessage: (content: string) => React.ReactNode;
 }) {
 	const listRef = useRef<HTMLUListElement>(null);
 
@@ -353,7 +488,7 @@ function Messages({
 							}
 						)}
 					>
-						{message.content}
+						{renderMessage(message.content)}
 					</div>
 				</li>
 			))}
