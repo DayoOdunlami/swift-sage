@@ -450,10 +450,10 @@ export default function TestV2() {
 							onChange={(e) => setLlmProvider(e.target.value)}
 							className="w-full px-3 py-1 border rounded"
 						>
-							<option value="groq">⚡ Groq Llama-3 (Free, Fast)</option>
-							<option value="openai">🧠 OpenAI GPT-4 (Reliable, ~$0.015/call)</option>
-							<option value="claude">🎯 Claude 3 (Smart, ~$0.025/call)</option>
-							<option value="gemini">🔍 Google Gemini (Fast, ~$0.012/call)</option>
+							<option value="groq">⚡ Groq Llama-3 (Free, Fast) ✅ Available</option>
+							<option value="openai" disabled>🧠 OpenAI GPT-4 (Coming Soon)</option>
+							<option value="claude" disabled>🎯 Claude 3 (Coming Soon)</option>
+							<option value="gemini" disabled>🔍 Google Gemini (Coming Soon)</option>
 						</select>
 					</div>
 					
@@ -465,9 +465,9 @@ export default function TestV2() {
 							onChange={(e) => setTtsProvider(e.target.value)}
 							className="w-full px-3 py-1 border rounded"
 						>
-							<option value="webspeech">🆓 Web Speech (Free, Browser)</option>
-							<option value="cartesia">💰 Cartesia (Premium, ~$0.05/call)</option>
-							<option value="openai-tts">🎤 OpenAI TTS (Quality, ~$0.03/call)</option>
+							<option value="webspeech">🆓 Web Speech (Free, Browser) ✅ Available</option>
+							<option value="cartesia">💰 Cartesia (Premium, ~$0.05/call) ✅ Available</option>
+							<option value="openai-tts" disabled>🎤 OpenAI TTS (Coming Soon)</option>
 						</select>
 					</div>
 					

@@ -1,16 +1,15 @@
 // @ts-nocheck
 // This file is a carbon copy of the main API route for safe tool integration experiments.
 
-import Groq from "groq-sdk";
-import OpenAI from "openai";
+import { Groq } from "groq-sdk";
 import { headers } from "next/headers";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
 import { after } from "next/server";
 import { tools, createTask, listTasks, completeTask, updateTask, deleteTask, getProjects } from "../../../lib/todoist";
 
+// STAGE 2: Multi-LLM provider support (Groq only for now)
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const schema = zfd.formData({
 	input: z.union([zfd.text(), zfd.file()]),
@@ -37,9 +36,6 @@ const tool_functions = {
 function validateAPIKeys() {
 	const keys = {
 		groq: !!process.env.GROQ_API_KEY,
-		openai: !!process.env.OPENAI_API_KEY,
-		claude: !!process.env.ANTHROPIC_API_KEY,
-		gemini: !!process.env.GEMINI_API_KEY,
 		cartesia: !!process.env.CARTESIA_API_KEY,
 	};
 	
@@ -73,15 +69,13 @@ async function callLLM(provider: string, messages: any[], tools: any[]) {
 				});
 				
 			case 'openai':
-				return await openai.chat.completions.create({
-					messages, model: "gpt-4o-mini", tools, tool_choice: "auto"
-				});
+				throw new Error("OpenAI integration coming soon. Try Groq.");
 				
 			case 'claude':
-				throw new Error("Claude integration coming soon. Try OpenAI or Groq.");
+				throw new Error("Claude integration coming soon. Try Groq.");
 				
 			case 'gemini':
-				throw new Error("Gemini integration coming soon. Try OpenAI or Groq.");
+				throw new Error("Gemini integration coming soon. Try Groq.");
 				
 			default:
 				throw new Error(`Unknown provider: ${provider}`);
@@ -178,15 +172,7 @@ async function generateTTS(text: string, provider: string) {
 				});
 				
 			case 'openai-tts':
-				const mp3 = await openai.audio.speech.create({
-					model: "tts-1",
-					voice: "alloy",
-					input: text,
-				});
-				const buffer = Buffer.from(await mp3.arrayBuffer());
-				return new Response(buffer, {
-					headers: { "Content-Type": "audio/mpeg" }
-				});
+				throw new Error("OpenAI TTS integration coming soon. Try Groq.");
 				
 			default:
 				throw new Error(`Unknown TTS provider: ${provider}`);
