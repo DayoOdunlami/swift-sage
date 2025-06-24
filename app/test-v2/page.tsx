@@ -397,6 +397,9 @@ export default function TestV2() {
 		setInput("");
 	}
 
+	// ADD: Loading state for interruptSpeech and other async UI
+	const [isLoading, setIsLoading] = useState(false);
+
 	return (
 		<>
 			<title>Swift Sage - Test V2</title>
