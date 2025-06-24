@@ -124,9 +124,9 @@ export default function TestV2() {
 		setUsageStats(prev => {
 			const updated = {
 				...prev,
-				[provider]: {
-					calls: prev[provider].calls + 1,
-					estimatedCost: prev[provider].estimatedCost + cost,
+				[provider as keyof UsageStats]: {
+					calls: prev[provider as keyof UsageStats].calls + 1,
+					estimatedCost: prev[provider as keyof UsageStats].estimatedCost + cost,
 				}
 			};
 			
