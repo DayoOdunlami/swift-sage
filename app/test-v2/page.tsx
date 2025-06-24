@@ -202,6 +202,7 @@ export default function TestV2() {
 		const transcript = decodeURIComponent(
 			response.headers.get("X-Transcript") || ""
 		);
+		console.log("🎤 Voice input received:", transcript);
 		const text = decodeURIComponent(response.headers.get("X-Response") || "");
 
 		if (!response.ok || !transcript || !text) {
@@ -229,7 +230,7 @@ export default function TestV2() {
 				const utterance = new SpeechSynthesisUtterance(cleanText);
 				utterance.rate = 1.0;
 				utterance.pitch = 1.0;
-				
+				console.log("🔊 TTS starting playback");
 				utterance.onend = () => {
 					setTimeout(() => {
 						if (vad) {
@@ -237,7 +238,6 @@ export default function TestV2() {
 						}
 					}, 500);
 				};
-				
 				speechSynthesis.speak(utterance);
 			}
 			
@@ -265,6 +265,7 @@ export default function TestV2() {
 
 		const latency = Date.now() - submittedAt;
 		player.play(response.body, () => {
+			console.log("🔊 TTS starting playback");
 			const isFirefox = navigator.userAgent.includes("Firefox");
 			if (isFirefox) vad.start();
 		});

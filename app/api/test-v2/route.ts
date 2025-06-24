@@ -32,6 +32,7 @@ const tool_functions = {
 };
 
 export async function POST(request: Request) {
+	console.log("📡 API route called");
 	console.time("transcribe " + request.headers.get("x-vercel-id") || "local");
 
 	const formData = await request.formData();
@@ -54,6 +55,7 @@ export async function POST(request: Request) {
 	// Use Groq for AI processing
 	let response: string;
 	try {
+		console.log("🧠 Calling Groq API");
 		const completion = await groq.chat.completions.create({
 			model: "llama3-8b-8192",
 			messages: [
@@ -127,10 +129,14 @@ When in doubt, use the tools to get real data rather than guessing or making exa
 		"ai processing " + request.headers.get("x-vercel-id") || "local"
 	);
 
-	if (!response) return new Response("Invalid response", { status: 500 });
+	if (!response) {
+		console.log("✅ Sending response back");
+		return new Response("Invalid response", { status: 500 });
+	}
 
 	// REPLACE: The entire Cartesia TTS section with provider logic
 	if (useWebSpeech) {
+		console.log("✅ Sending response back");
 		// Web Speech API (free) - return text for browser TTS
 		return new Response(response, {
 			headers: {
@@ -173,6 +179,7 @@ When in doubt, use the tools to get real data rather than guessing or making exa
 		);
 
 		if (!voice.ok) {
+			console.log("✅ Sending response back");
 			console.error(await voice.text());
 			return new Response("Voice synthesis failed", { status: 500 });
 		}
@@ -189,6 +196,7 @@ When in doubt, use the tools to get real data rather than guessing or making exa
 			},
 		});
 	}
+	console.log("✅ Sending response back");
 }
 
 async function location() {
