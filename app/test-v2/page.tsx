@@ -138,7 +138,7 @@ export default function TestV2() {
 	// Reset usage
 	const resetUsage = () => {
 		const resetStats = Object.keys(usageStats).reduce((acc, key) => {
-			acc[key] = { calls: 0, estimatedCost: 0 };
+			acc[key as keyof UsageStats] = { calls: 0, estimatedCost: 0 };
 			return acc;
 		}, {} as UsageStats);
 		
