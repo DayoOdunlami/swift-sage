@@ -52,16 +52,16 @@ export async function POST(request: Request) {
 		"ai processing " + request.headers.get("x-vercel-id") || "local"
 	);
 
-	// Use Groq for AI processing
+	// Use provider-aware logic for AI processing
 	let response: string;
 	try {
-		console.log("🧠 Calling Groq API");
-		const completion = await groq.chat.completions.create({
-			model: "llama3-8b-8192",
-			messages: [
-				{
-					role: "system",
-					content: `You are Swift Sage, a helpful voice assistant with access to the user's Todoist account.
+		const llmProvider = formData.get("llmProvider") || "groq";
+		console.log("🧠 Using provider:", llmProvider);
+		let completion;
+		const messages = [
+			{
+				role: "system",
+				content: `You are Swift Sage, a helpful voice assistant with access to the user's Todoist account.
 
 CRITICAL TOOL USAGE RULES:
 1. When user asks about "my tasks", "my data", or personal information - ALWAYS use the available tools first
@@ -78,16 +78,32 @@ RESPONSE FORMATTING:
 AVAILABLE TOOLS: createTask, listTasks, completeTask, updateTask, deleteTask, getProjects
 
 When in doubt, use the tools to get real data rather than guessing or making examples.`,
-				},
-				...data.message,
-				{
-					role: "user",
-					content: transcript,
-				},
-			],
-			tools,
-			tool_choice: "auto",
-		});
+			},
+			...data.message,
+			{
+				role: "user",
+				content: transcript,
+			},
+		];
+		const availableTools = tools;
+		if (llmProvider === "openai") {
+			// Dynamic import to avoid package.json issues
+			const { default: OpenAI } = await import('https://esm.sh/openai@4.0.0');
+			const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+			completion = await openai.chat.completions.create({
+				messages,
+				model: "gpt-4o-mini",
+				tools: availableTools,
+				tool_choice: "auto",
+			});
+		} else {
+			completion = await groq.chat.completions.create({
+				model: "llama3-8b-8192",
+				messages,
+				tools: availableTools,
+				tool_choice: "auto",
+			});
+		}
 
 		let final_response = completion.choices[0].message.content;
 		const tool_calls = completion.choices[0].message.tool_calls;
