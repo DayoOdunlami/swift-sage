@@ -119,7 +119,7 @@ export default function TestV2() {
 
 	// Track usage function
 	const trackUsage = (provider: string) => {
-		const cost = PRICING[provider] || 0;
+		const cost = PRICING[provider as keyof typeof PRICING] || 0;
 		
 		setUsageStats(prev => {
 			const updated = {
