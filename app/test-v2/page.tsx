@@ -400,6 +400,8 @@ export default function TestV2() {
 	// ADD: Loading state for interruptSpeech and other async UI
 	const [isLoading, setIsLoading] = useState(false);
 
+	// FORCE FRESH BUILD: Latest fixes applied - all TypeScript errors resolved
+
 	return (
 		<>
 			<title>Swift Sage - Test V2</title>
